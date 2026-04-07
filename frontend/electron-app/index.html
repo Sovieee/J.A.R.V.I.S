@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Jarvis</title>
+</head>
+
+<body style="background:#020617; color:white; font-family:sans-serif; padding:20px;">
+
+<h2 style="color:#38bdf8;">🤖 JARVIS</h2>
+
+<!-- 🔹 STATUS -->
+<div id="status" style="margin-bottom:10px; color:#22c55e;">
+  Idle
+</div>
+
+<!-- 🔹 CHAT -->
+<div id="chat" style="
+height:300px;
+overflow:auto;
+border:1px solid #1e293b;
+padding:10px;
+margin-bottom:10px;
+box-shadow:0 0 10px #38bdf8;
+background:#020617;
+"></div>
+
+<!-- 🔹 INPUT -->
+<input id="commandInput" placeholder="Enter command..."
+style="width:60%; padding:10px; background:#020617; color:white; border:1px solid #38bdf8;" />
+
+<button onclick="startListening()" style="padding:10px; background:#22c55e; border:none;">
+🎤 Speak
+</button>
+
+<button onclick="sendCommand()" style="padding:10px; background:#38bdf8; border:none;">
+Send
+</button>
+<button onclick="stopListening()" style="padding:10px; background:red; border:none;">
+🛑 Stop
+</button>
+
+<!-- 🔥 SCRIPT -->
+<script>
+async function sendCommand() {
+  const input = document.getElementById("commandInput");
+  const chat = document.getElementById("chat");
+  const status = document.getElementById("status");
+
+  const command = input.value;
+  if (!command) return;
+
+  // Show user message
+  chat.innerHTML += `<div style="text-align:right; color:#38bdf8;">You: ${command}</div>`;
+  status.innerText = "Thinking...";
+
+  try {
+    const res = await fetch("http://127.0.0.1:5000/command", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ command })
+    });
+
+    const data = await res.json();
+
+    // Show Jarvis response
+    const reply = data.response || "Done";
+    chat.innerHTML += `<div style="text-align:left; color:#22c55e;">Jarvis: ${data.response}</div>`;
+    status.innerText = "Idle";
+
+  } catch (err) {
+    chat.innerHTML += `<div style="color:red;">Error connecting to Jarvis</div>`;
+    status.innerText = "Error";
+  }
+
+  chat.scrollTop = chat.scrollHeight;
+  input.value = "";
+}
+
+let isListening = false;
+
+async function startListening() {
+  if (isListening) return;
+
+  isListening = true;
+
+  const chat = document.getElementById("chat");
+  const status = document.getElementById("status");
+
+  while (isListening) {
+    status.innerText = "Listening...";
+
+    try {
+      const res = await fetch("http://127.0.0.1:5000/voice");
+      const data = await res.json();
+
+      if (data.command) {
+        chat.innerHTML += `<div style="text-align:right; color:#38bdf8;">You: ${data.command}</div>`;
+        chat.innerHTML += `<div style="text-align:left; color:#22c55e;">Jarvis: ${data.response}</div>`;
+      }
+
+      chat.scrollTop = chat.scrollHeight;
+
+    } catch (err) {
+      chat.innerHTML += `<div style="color:red;">Voice error</div>`;
+      break;
+    }
+  }
+
+  status.innerText = "Idle";
+}
+
+function stopListening() {
+  isListening = false;
+}
+</script>
+
+</body>
+</html>
