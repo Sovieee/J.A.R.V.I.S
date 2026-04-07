@@ -1,0 +1,58 @@
+# ----------------------
+# 🐍 Python
+# ----------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# ----------------------
+# ⚡ Node / Electron
+# ----------------------
+node_modules/
+frontend/electron-app/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Optional
+package-lock.json
+
+# ----------------------
+# 🧠 Project Data (IMPORTANT)
+# ----------------------
+activity_log.json
+memory.json
+
+# ----------------------
+# 🔐 Environment / Secrets
+# ----------------------
+.env
+
+# ----------------------
+# 💻 OS Files
+# ----------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------
+# 🧪 VS Code / IDE
+# ----------------------
+.vscode/
+.idea/
+
+# ----------------------
+# 📦 Build / Dist (Electron)
+# ----------------------
+dist/
+build/
+out/
+*.exe
