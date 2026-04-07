@@ -25,3 +25,13 @@ def set_preference(key, value):
 def get_preference(key):
     memory = load_memory()
     return memory.get(key, None)
+
+def save_fact(key, value):
+    data = load_memory()
+    data[key] = value
+    save_memory(data)
+
+
+def get_fact(key):
+    data = load_memory()
+    return data.get(key)

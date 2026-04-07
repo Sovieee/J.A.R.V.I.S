@@ -5,6 +5,10 @@ from intelligence.memory import set_preference, get_preference
 from intelligence.learning import log_activity, get_frequent_actions
 from voice.voice_output import speak
 from intelligence.learning import get_time_based_suggestion
+from intelligence.memory import save_fact, get_fact
+from intelligence.ai_brain import ask_ai
+from intelligence.context_memory import add_to_history
+
 from intelligence.context_state import (
     set_pending_intent,
     get_pending_intent,
@@ -103,13 +107,60 @@ def handle_command(command):
         speak("Goodbye!")
         exit()
 
-    # 🔹 TIME-AWARE SUGGESTION
+            # 🔹 MEMORY LEARNING (store facts)
 
+    if "my name is" in command:
+        name = command.split("my name is")[-1].strip()
+        save_fact("name", name)
+        message = f"Nice to meet you, {name}"
+        speak(message)
+        return message
+
+    if "i like" in command:
+        thing = command.split("i like")[-1].strip()
+        save_fact("likes", thing)
+        message = f"Got it, you like {thing}"
+        speak(message)
+        return message
+
+
+    # 🔹 MEMORY RECALL
+
+    if "what is my name" in command:
+        name = get_fact("name")
+        if name:
+            message = f"Your name is {name}"
+        else:
+            message = "I don't know your name yet"
+
+        speak(message)
+        return message
+
+    if "what do i like" in command:
+        like = get_fact("likes")
+        if like:
+            message = f"You like {like}"
+        else:
+            message = "I don't know your preferences yet"
+
+        speak(message)
+        return message
+
+    add_to_history("User", command)
+
+        # 🔹 FALLBACK → AI FIRST
+    ai_response = ask_ai(command)
+    
+    if ai_response and "AI brain is not connected" not in ai_response:
+        add_to_history("Jarvis", ai_response)
+        speak(ai_response)
+        return ai_response
+
+
+    # 🔹 THEN TIME-AWARE SUGGESTION (only if AI fails)
     suggestion = get_time_based_suggestion()
 
     if suggestion and suggestion != command:
-    
-    #  Don't repeat rejected suggestion
         if suggestion == last_suggestion and suggestion_rejected:
             return "Sorry, I don't understand that command."
 
@@ -120,5 +171,6 @@ def handle_command(command):
         speak(message)
         return message
 
-    # 🔹 FALLBACK
+
+    # 🔹 FINAL FALLBACK
     return "Sorry, I don't understand that command."
