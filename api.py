@@ -1,7 +1,12 @@
 from flask import Flask, request, jsonify
 from commands.command_handler import handle_command
+from flask_socketio import SocketIO
+import time
+from intelligence.context_state import set_conversation_mode
+
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 @app.route("/command", methods=["POST"])
 def run_command():
@@ -19,25 +24,33 @@ def run_command():
     
     return jsonify({"status": "error"})
 
-@app.route("/voice", methods=["GET"])
-def voice_command():
-    from voice.voice_input import listen_command
+@socketio.on("start_listening")
+def handle_listening():
+    from voice.wake_listener import listen_wake_word
 
-    command = listen_command()
-    print("[VOICE] Heard:", command)
+    print("🎤 Listening started...")
 
-    if command:
-        response = handle_command(command)
-        return jsonify({
-            "command": command,
-            "response": response
+    last_active_time = time.time()
+
+    while True:
+        command = listen_wake_word()
+
+# Only reset if NO command AND timeout reached
+        if not command and (time.time() - last_active_time > 60):
+            set_conversation_mode(False)
+
+        if command:
+            last_active_time = time.time()
+
+            print("[WAKE] Heard:", command)
+
+            response = handle_command(command)
+
+            socketio.emit("jarvis_response", {
+                "command": command,
+                "response": response
         })
-
-    return jsonify({
-        "command": "",
-        "response": "Could not understand"
-    })
 
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    socketio.run(app, debug=True)

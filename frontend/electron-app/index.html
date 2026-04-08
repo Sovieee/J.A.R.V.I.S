@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>Jarvis</title>
+  <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
 </head>
 
 <body style="background:#020617; color:white; font-family:sans-serif; padding:20px;">
@@ -77,43 +78,29 @@ async function sendCommand() {
   chat.scrollTop = chat.scrollHeight;
   input.value = "";
 }
+</script>
+<script>
+const socket = io("http://127.0.0.1:5000");
 
-let isListening = false;
-
-async function startListening() {
-  if (isListening) return;
-
-  isListening = true;
-
+function startListening() {
   const chat = document.getElementById("chat");
-  const status = document.getElementById("status");
 
-  while (isListening) {
-    status.innerText = "Listening...";
+  chat.innerHTML += `<div>🎤 Jarvis is active...</div>`;
 
-    try {
-      const res = await fetch("http://127.0.0.1:5000/voice");
-      const data = await res.json();
+  socket.emit("start_listening");
 
-      if (data.command) {
-        chat.innerHTML += `<div style="text-align:right; color:#38bdf8;">You: ${data.command}</div>`;
-        chat.innerHTML += `<div style="text-align:left; color:#22c55e;">Jarvis: ${data.response}</div>`;
-      }
-
-      chat.scrollTop = chat.scrollHeight;
-
-    } catch (err) {
-      chat.innerHTML += `<div style="color:red;">Voice error</div>`;
-      break;
-    }
-  }
-
-  status.innerText = "Idle";
+  socket.on("jarvis_response", (data) => {
+    chat.innerHTML += `<div>You: ${data.command}</div>`;
+    chat.innerHTML += `<div>Jarvis: ${data.response}</div>`;
+    chat.scrollTop = chat.scrollHeight;
+  });
 }
+</script>
 
-function stopListening() {
-  isListening = false;
-}
+<script>
+window.onload = () => {
+  startListening();
+};
 </script>
 
 </body>
