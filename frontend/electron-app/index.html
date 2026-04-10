@@ -1,106 +1,266 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Jarvis</title>
+  <title>JARVIS</title>
   <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+
+  <style>
+    body {
+      background: radial-gradient(circle at center, #020617, #000000);
+      color: white;
+      font-family: "Segoe UI", sans-serif;
+      padding: 20px;
+    }
+
+    h2 {
+      color: #38bdf8;
+      letter-spacing: 2px;
+    }
+
+    #status {
+      margin-bottom: 10px;
+      color: #22c55e;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    #chat {
+      height: 400px;
+      overflow-y: auto;
+      border: 1px solid #1e293b;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(56,189,248,0.4);
+      background: rgba(2,6,23,0.8);
+      backdrop-filter: blur(10px);
+    }
+
+    .message {
+      margin: 8px 0;
+      padding: 10px 14px;
+      border-radius: 10px;
+      max-width: 70%;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .user {
+      text-align: right;
+      margin-left: auto;
+      background: rgba(56,189,248,0.2);
+      color: #38bdf8;
+    }
+
+    .jarvis {
+      text-align: left;
+      background: rgba(34,197,94,0.15);
+      color: #22c55e;
+    }
+
+    input {
+      width: 55%;
+      padding: 12px;
+      background: #020617;
+      color: white;
+      border: 1px solid #38bdf8;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    button {
+      padding: 12px;
+      border: none;
+      margin-left: 5px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+    }
+
+    .speak { background: #22c55e; }
+    .send { background: #38bdf8; }
+    .stop { background: red; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #visualizer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 40px;
+  margin-bottom: 10px;
+  gap: 5px;
+}
+
+.bar {
+  width: 5px;
+  height: 10px;
+  background: #38bdf8;
+  border-radius: 5px;
+  animation: idleWave 1s infinite ease-in-out;
+}
+
+@keyframes idleWave {
+  0%, 100% { height: 8px; }
+  50% { height: 12px; }
+}
+
+/* 🔥 ACTIVE SPEAKING */
+.speaking .bar {
+  animation: speakWave 0.4s infinite ease-in-out;
+}
+
+@keyframes speakWave {
+  0% { height: 5px; }
+  50% { height: 30px; }
+  100% { height: 10px; }
+}
+
+/* 🎤 LISTENING MODE */
+.listening .bar {
+  animation: listenWave 0.8s infinite ease-in-out;
+}
+
+@keyframes listenWave {
+  0% { height: 10px; }
+  50% { height: 20px; }
+  100% { height: 10px; }
+}
+
+.speak {
+  background: #22c55e;
+  box-shadow: 0 0 10px #22c55e;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 5px #22c55e; }
+  50% { box-shadow: 0 0 20px #22c55e; }
+  100% { box-shadow: 0 0 5px #22c55e; }
+}
+  </style>
 </head>
 
-<body style="background:#020617; color:white; font-family:sans-serif; padding:20px;">
+<body>
 
-<h2 style="color:#38bdf8;">🤖 JARVIS</h2>
+<h2>🤖 JARVIS</h2>
+<div id="status">Idle</div>
 
-<!-- 🔹 STATUS -->
-<div id="status" style="margin-bottom:10px; color:#22c55e;">
-  Idle
+<div id="chat"></div>
+<div id="visualizer">
+  <div class="bar"></div>
+  <div class="bar"></div>
+  <div class="bar"></div>
+  <div class="bar"></div>
+  <div class="bar"></div>
 </div>
+<input id="commandInput" placeholder="Enter command..." />
+<button class="speak" onclick="startListening()">🎤</button>
+<button class="send" onclick="sendCommand()">Send</button>
+<button class="stop" onclick="stopListening()">⛔</button>
 
-<!-- 🔹 CHAT -->
-<div id="chat" style="
-height:300px;
-overflow:auto;
-border:1px solid #1e293b;
-padding:10px;
-margin-bottom:10px;
-box-shadow:0 0 10px #38bdf8;
-background:#020617;
-"></div>
-
-<!-- 🔹 INPUT -->
-<input id="commandInput" placeholder="Enter command..."
-style="width:60%; padding:10px; background:#020617; color:white; border:1px solid #38bdf8;" />
-
-<button onclick="startListening()" style="padding:10px; background:#22c55e; border:none;">
-🎤 Speak
-</button>
-
-<button onclick="sendCommand()" style="padding:10px; background:#38bdf8; border:none;">
-Send
-</button>
-<button onclick="stopListening()" style="padding:10px; background:red; border:none;">
-🛑 Stop
-</button>
-
-<!-- 🔥 SCRIPT -->
-<script>
-async function sendCommand() {
-  const input = document.getElementById("commandInput");
-  const chat = document.getElementById("chat");
-  const status = document.getElementById("status");
-
-  const command = input.value;
-  if (!command) return;
-
-  // Show user message
-  chat.innerHTML += `<div style="text-align:right; color:#38bdf8;">You: ${command}</div>`;
-  status.innerText = "Thinking...";
-
-  try {
-    const res = await fetch("http://127.0.0.1:5000/command", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ command })
-    });
-
-    const data = await res.json();
-
-    // Show Jarvis response
-    const reply = data.response || "Done";
-    chat.innerHTML += `<div style="text-align:left; color:#22c55e;">Jarvis: ${data.response}</div>`;
-    status.innerText = "Idle";
-
-  } catch (err) {
-    chat.innerHTML += `<div style="color:red;">Error connecting to Jarvis</div>`;
-    status.innerText = "Error";
-  }
-
-  chat.scrollTop = chat.scrollHeight;
-  input.value = "";
-}
-</script>
 <script>
 const socket = io("http://127.0.0.1:5000");
+const visualizer = document.getElementById("visualizer");
+
+function setState(state) {
+  visualizer.classList.remove("speaking", "listening");
+
+  if (state === "speaking") {
+    visualizer.classList.add("speaking");
+  } else if (state === "listening") {
+    visualizer.classList.add("listening");
+  }
+}
+
+const chat = document.getElementById("chat");
+const status = document.getElementById("status");
+
+function addMessage(text, type) {
+  const div = document.createElement("div");
+  div.className = `message ${type}`;
+  div.innerText = text;
+  chat.appendChild(div);
+  chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
+}
+
+async function sendCommand() {
+  const input = document.getElementById("commandInput");
+  const command = input.value;
+
+  if (!command) return;
+
+  addMessage("You: " + command, "user");
+  status.innerText = "🧠 Thinking...";
+
+  const res = await fetch("http://127.0.0.1:5000/command", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command })
+  });
+
+  const data = await res.json();
+  addMessage("Jarvis: " + data.response, "jarvis");
+
+  status.innerText = "🎤 Listening...";
+  input.value = "";
+}
+
+let started = false;
 
 function startListening() {
-  const chat = document.getElementById("chat");
+  if (started) return;
+  started = true;
 
-  chat.innerHTML += `<div>🎤 Jarvis is active...</div>`;
+  addMessage("🎤 Jarvis activated", "jarvis");
+  status.innerText = "🎤 Listening...";
+  setState("listening");
 
   socket.emit("start_listening");
-
-  socket.on("jarvis_response", (data) => {
-    chat.innerHTML += `<div>You: ${data.command}</div>`;
-    chat.innerHTML += `<div>Jarvis: ${data.response}</div>`;
-    chat.scrollTop = chat.scrollHeight;
-  });
 }
-</script>
 
-<script>
-window.onload = () => {
-  startListening();
-};
+let currentDiv = null;
+let currentText = "";
+
+socket.on("jarvis_user", (data) => {
+  addMessage("You: " + data.command, "user");
+  status.innerText = "🧠 Thinking...";
+  setState(""); // thinking mode (idle animation)
+});
+
+socket.on("jarvis_chunk", (data) => {
+  if (!currentDiv) {
+    currentDiv = document.createElement("div");
+    currentDiv.className = "message jarvis";
+    chat.appendChild(currentDiv);
+  }
+
+  currentText += data.chunk + " ";
+  currentDiv.innerText = "Jarvis: " + currentText;
+
+  chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
+  status.innerText = "💬 Responding...";
+  setState("speaking");
+});
+
+socket.on("jarvis_done", () => {
+  currentDiv = null;
+  currentText = "";
+  status.innerText = "🎤 Listening...";
+  setState("listening");
+});
+
+function stopListening() {
+  location.reload();
+}
+
+window.onload = startListening;
 </script>
 
 </body>
