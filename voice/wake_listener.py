@@ -1,6 +1,8 @@
 from voice.voice_input import listen_command
 from intelligence.context_state import get_conversation_mode, set_conversation_mode
 
+WAKE_WORD = "jarvis"
+
 def listen_wake_word():
     command = listen_command()
 
@@ -9,13 +11,17 @@ def listen_wake_word():
 
     command = command.lower()
 
-    # 🔹 If already in conversation mode → skip wake word
+    # ✅ If already in conversation → skip wake word
     if get_conversation_mode():
         return command
 
-    # 🔹 Activate on wake word
-    if "hey jarvis" in command:
+    # ✅ Detect wake word
+    if WAKE_WORD in command:
         set_conversation_mode(True)
-        return command.replace("hey jarvis", "").strip()
+
+        # remove wake word from command
+        command = command.replace(WAKE_WORD, "").strip()
+
+        return command
 
     return None

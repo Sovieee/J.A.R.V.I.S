@@ -8,16 +8,18 @@ from intelligence.learning import get_time_based_suggestion
 from intelligence.memory import save_fact, get_fact
 from intelligence.ai_brain import ask_ai
 from intelligence.context_memory import add_to_history
-
+import time
 from intelligence.context_state import (
     set_pending_intent,
     get_pending_intent,
-    clear_pending_intent
+    clear_pending_intent,
+    set_conversation_mode
 )
 
 # 🔹 Store last suggestion
 last_suggestion = None
 suggestion_rejected = False
+
 
 def handle_command(command):
     
@@ -46,17 +48,21 @@ def handle_command(command):
     print(f"[DEBUG] Detected Intent: {intent}")
 
     # 🔹 Handle YES / NO for suggestions
-    if any(word in command for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "do it"]):
+    words = command.lower().split()
+    if any(word in words for word in ["yes", "yeah", "yep", "sure", "ok", "okay"]):
         if last_suggestion:
             print(f"[DEBUG] Executing suggested command: {last_suggestion}")
             cmd = last_suggestion
             last_suggestion = None
             return handle_command(cmd)
 
-    if any(word in command for word in ["no", "nope", "nah", "don't", "dont"]):
+    words = command.lower().split()
+    if any(word in words for word in ["no", "nope", "nah", "don't", "dont"]):
         suggestion_rejected = True
         last_suggestion = None
-        return speak("Okay, ignoring suggestion.")
+        message = "Okay, ignoring suggestion."
+        speak(message)
+        return message
 
     # 🔹 SET PREFERENCE
     if "set browser to" in command:
@@ -79,14 +85,18 @@ def handle_command(command):
             elif browser == "notepad":
                 return open_notepad()
             else:
-                return speak("No browser preference set")
+                message = "No browser preference set"
+                speak(message)
+                return message
 
         # Direct commands
         if "chrome" in command:
-            return open_chrome()
+            open_chrome()
+            return "Opening Chrome"
 
         if "notepad" in command:
-            return open_notepad()
+            open_notepad()
+            return "Opening Notepad"
 
     # 🔹 SEARCH
     elif intent == "search":
@@ -94,7 +104,8 @@ def handle_command(command):
 
         if len(words) > 1:
             query = " ".join(words[1:])
-            return search_google(query)
+            search_google(query)
+            return f"Searching for {query}"
 
         else:
             set_pending_intent("search")
@@ -104,8 +115,9 @@ def handle_command(command):
 
     # 🔹 EXIT
     elif intent == "exit":
+        set_conversation_mode(False)  # 🔥 turn off conversation mode
         speak("Goodbye!")
-        exit()
+        return "Goodbye!"
 
             # 🔹 MEMORY LEARNING (store facts)
 
@@ -146,13 +158,20 @@ def handle_command(command):
         speak(message)
         return message
 
-    add_to_history("User", command)
+    # 🔹 ADD USER TO MEMORY (IMPORTANT: lowercase roles)
+    add_to_history("user", command)
 
-        # 🔹 FALLBACK → AI FIRST
+    # 🔹 AI RESPONSE
     ai_response = ask_ai(command)
-    
+
+    # 🔹 ADD AI RESPONSE TO MEMORY
+    if ai_response:
+        add_to_history("assistant", ai_response)
+
+    # 🔹 SPEAK + RETURN (Fallback)
     if ai_response and "AI brain is not connected" not in ai_response:
-        add_to_history("Jarvis", ai_response)
+        set_conversation_mode(True)  # 🔥 KEEP LISTENING
+        time.sleep(0.1)
         speak(ai_response)
         return ai_response
 
@@ -173,4 +192,6 @@ def handle_command(command):
 
 
     # 🔹 FINAL FALLBACK
-    return "Sorry, I don't understand that command."
+    final_msg = "Sorry, I don't understand that command."
+    speak(final_msg)
+    return final_msg
