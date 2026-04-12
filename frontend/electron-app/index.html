@@ -1,266 +1,413 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>JARVIS</title>
+  <title>J.A.R.V.I.S</title>
   <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
 
   <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      background: radial-gradient(circle at center, #020617, #000000);
-      color: white;
+      background: #030712;
+      color: #e2e8f0;
       font-family: "Segoe UI", sans-serif;
-      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
     }
 
-    h2 {
+    .container {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1.5px solid #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
       color: #38bdf8;
-      letter-spacing: 2px;
+      font-weight: 600;
     }
 
-    #status {
-      margin-bottom: 10px;
+    .logo-text {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      color: #38bdf8;
+    }
+
+    .status-pill {
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid #22c55e44;
+      background: #22c55e11;
       color: #22c55e;
-      font-size: 14px;
+      letter-spacing: 1px;
       transition: all 0.3s ease;
     }
 
-    #chat {
-      height: 400px;
-      overflow-y: auto;
-      border: 1px solid #1e293b;
-      padding: 15px;
-      margin-bottom: 15px;
-      border-radius: 10px;
-      box-shadow: 0 0 20px rgba(56,189,248,0.4);
-      background: rgba(2,6,23,0.8);
-      backdrop-filter: blur(10px);
+    .status-pill.thinking {
+      border-color: #f59e0b44;
+      background: #f59e0b11;
+      color: #f59e0b;
     }
 
-    .message {
-      margin: 8px 0;
-      padding: 10px 14px;
-      border-radius: 10px;
-      max-width: 70%;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .user {
-      text-align: right;
-      margin-left: auto;
-      background: rgba(56,189,248,0.2);
+    .status-pill.responding {
+      border-color: #38bdf844;
+      background: #38bdf811;
       color: #38bdf8;
     }
 
-    .jarvis {
-      text-align: left;
-      background: rgba(34,197,94,0.15);
-      color: #22c55e;
+    /* Visualizer */
+    .visualizer-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      height: 48px;
     }
 
-    input {
-      width: 55%;
-      padding: 12px;
-      background: #020617;
-      color: white;
-      border: 1px solid #38bdf8;
-      border-radius: 6px;
-      outline: none;
+    .bar {
+      width: 3px;
+      border-radius: 4px;
+      background: #38bdf8;
+      animation: idle 1.4s ease-in-out infinite;
     }
 
-    button {
-      padding: 12px;
-      border: none;
-      margin-left: 5px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: 0.2s;
+    .bar:nth-child(1) { height: 12px; animation-delay: 0.0s; }
+    .bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+    .bar:nth-child(3) { height: 28px; animation-delay: 0.2s; }
+    .bar:nth-child(4) { height: 36px; animation-delay: 0.15s; }
+    .bar:nth-child(5) { height: 28px; animation-delay: 0.25s; }
+    .bar:nth-child(6) { height: 20px; animation-delay: 0.1s; }
+    .bar:nth-child(7) { height: 12px; animation-delay: 0.0s; }
+
+    @keyframes idle {
+      0%, 100% { opacity: 0.3; transform: scaleY(0.6); }
+      50% { opacity: 1; transform: scaleY(1); }
     }
 
-    button:hover {
-      transform: scale(1.05);
+    @keyframes listenWave {
+      0%, 100% { opacity: 0.6; transform: scaleY(0.8); }
+      50% { opacity: 1; transform: scaleY(1.3); }
     }
 
-    .speak { background: #22c55e; }
-    .send { background: #38bdf8; }
-    .stop { background: red; }
+    @keyframes speakWave {
+      0% { transform: scaleY(0.4); opacity: 0.5; }
+      50% { transform: scaleY(1.6); opacity: 1; }
+      100% { transform: scaleY(0.4); opacity: 0.5; }
+    }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
+    .visualizer-wrap.listening .bar {
+      animation: listenWave 0.8s ease-in-out infinite;
+      background: #22c55e;
+    }
+
+    .visualizer-wrap.speaking .bar {
+      animation: speakWave 0.4s ease-in-out infinite;
+      background: #38bdf8;
+    }
+
+    /* Chat window */
+    .chat-wrap { position: relative; }
+
+    .corner { position: absolute; width: 10px; height: 10px; }
+    .corner-tl { top: -1px; left: -1px; border-top: 2px solid #38bdf8; border-left: 2px solid #38bdf8; border-radius: 2px 0 0 0; }
+    .corner-tr { top: -1px; right: -1px; border-top: 2px solid #38bdf8; border-right: 2px solid #38bdf8; border-radius: 0 2px 0 0; }
+    .corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid #38bdf8; border-left: 2px solid #38bdf8; border-radius: 0 0 0 2px; }
+    .corner-br { bottom: -1px; right: -1px; border-bottom: 2px solid #38bdf8; border-right: 2px solid #38bdf8; border-radius: 0 0 2px 0; }
+
+    .chat {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(56,189,248,0.15);
+      border-radius: 16px;
+      padding: 20px;
+      height: 400px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      backdrop-filter: blur(12px);
+    }
+
+    .chat::-webkit-scrollbar { width: 4px; }
+    .chat::-webkit-scrollbar-track { background: transparent; }
+    .chat::-webkit-scrollbar-thumb { background: #38bdf822; border-radius: 4px; }
+
+    .msg {
+      display: flex;
+      flex-direction: column;
+      max-width: 75%;
+      gap: 4px;
+      animation: fadeUp 0.3s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    #visualizer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 40px;
-  margin-bottom: 10px;
-  gap: 5px;
-}
+    .msg.user { align-self: flex-end; align-items: flex-end; }
+    .msg.jarvis { align-self: flex-start; align-items: flex-start; }
 
-.bar {
-  width: 5px;
-  height: 10px;
-  background: #38bdf8;
-  border-radius: 5px;
-  animation: idleWave 1s infinite ease-in-out;
-}
+    .msg-label {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      font-weight: 600;
+    }
 
-@keyframes idleWave {
-  0%, 100% { height: 8px; }
-  50% { height: 12px; }
-}
+    .msg.user .msg-label { color: #38bdf866; }
+    .msg.jarvis .msg-label { color: #22c55e66; }
 
-/* 🔥 ACTIVE SPEAKING */
-.speaking .bar {
-  animation: speakWave 0.4s infinite ease-in-out;
-}
+    .bubble {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
 
-@keyframes speakWave {
-  0% { height: 5px; }
-  50% { height: 30px; }
-  100% { height: 10px; }
-}
+    .msg.user .bubble {
+      background: rgba(56,189,248,0.1);
+      border: 1px solid rgba(56,189,248,0.2);
+      color: #bae6fd;
+      border-bottom-right-radius: 4px;
+    }
 
-/* 🎤 LISTENING MODE */
-.listening .bar {
-  animation: listenWave 0.8s infinite ease-in-out;
-}
+    .msg.jarvis .bubble {
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.15);
+      color: #bbf7d0;
+      border-bottom-left-radius: 4px;
+    }
 
-@keyframes listenWave {
-  0% { height: 10px; }
-  50% { height: 20px; }
-  100% { height: 10px; }
-}
+    /* Input area */
+    .input-area {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
 
-.speak {
-  background: #22c55e;
-  box-shadow: 0 0 10px #22c55e;
-  animation: pulse 1.5s infinite;
-}
+    .text-input {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(56,189,248,0.2);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: #e2e8f0;
+      font-size: 13.5px;
+      outline: none;
+      font-family: "Segoe UI", sans-serif;
+      transition: border-color 0.2s;
+    }
 
-@keyframes pulse {
-  0% { box-shadow: 0 0 5px #22c55e; }
-  50% { box-shadow: 0 0 20px #22c55e; }
-  100% { box-shadow: 0 0 5px #22c55e; }
-}
+    .text-input::placeholder { color: #475569; }
+    .text-input:focus { border-color: rgba(56,189,248,0.5); }
+
+    .btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      transition: transform 0.15s, opacity 0.15s;
+      flex-shrink: 0;
+    }
+
+    .btn:hover { transform: scale(1.06); opacity: 0.9; }
+    .btn:active { transform: scale(0.96); }
+
+    .btn-mic { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #22c55e; }
+    .btn-send { background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; }
+    .btn-stop { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #f87171; }
   </style>
 </head>
 
 <body>
+<div class="container">
 
-<h2>🤖 JARVIS</h2>
-<div id="status">Idle</div>
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">J</div>
+      <div class="logo-text">J.A.R.V.I.S</div>
+    </div>
+    <div class="status-pill" id="status">LISTENING</div>
+  </div>
 
-<div id="chat"></div>
-<div id="visualizer">
-  <div class="bar"></div>
-  <div class="bar"></div>
-  <div class="bar"></div>
-  <div class="bar"></div>
-  <div class="bar"></div>
+  <!-- Visualizer -->
+  <div class="visualizer-wrap" id="visualizer">
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+  </div>
+
+  <!-- Chat -->
+  <div class="chat-wrap">
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+    <div class="chat" id="chat"></div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <button class="btn btn-mic" onclick="startListening()">&#127908;</button>
+    <input class="text-input" id="commandInput" placeholder="Type a command..." onkeydown="if(event.key==='Enter') sendCommand()" />
+    <button class="btn btn-send" onclick="sendCommand()">&#10148;</button>
+    <button class="btn btn-stop" onclick="stopListening()">&#9632;</button>
+  </div>
+
 </div>
-<input id="commandInput" placeholder="Enter command..." />
-<button class="speak" onclick="startListening()">🎤</button>
-<button class="send" onclick="sendCommand()">Send</button>
-<button class="stop" onclick="stopListening()">⛔</button>
 
 <script>
-const socket = io("http://127.0.0.1:5000");
-const visualizer = document.getElementById("visualizer");
+  const socket = io("http://127.0.0.1:5000");
+  const chat = document.getElementById("chat");
+  const status = document.getElementById("status");
+  const visualizer = document.getElementById("visualizer");
 
-function setState(state) {
-  visualizer.classList.remove("speaking", "listening");
+  function setState(state) {
+    visualizer.classList.remove("listening", "speaking");
+    status.classList.remove("thinking", "responding");
 
-  if (state === "speaking") {
-    visualizer.classList.add("speaking");
-  } else if (state === "listening") {
-    visualizer.classList.add("listening");
+    if (state === "listening") {
+      visualizer.classList.add("listening");
+      status.textContent = "LISTENING";
+    } else if (state === "thinking") {
+      status.classList.add("thinking");
+      status.textContent = "THINKING";
+    } else if (state === "speaking") {
+      visualizer.classList.add("speaking");
+      status.classList.add("responding");
+      status.textContent = "RESPONDING";
+    } else {
+      status.textContent = "IDLE";
+    }
   }
-}
 
-const chat = document.getElementById("chat");
-const status = document.getElementById("status");
+  function addMessage(text, type) {
+    const wrap = document.createElement("div");
+    wrap.className = `msg ${type}`;
 
-function addMessage(text, type) {
-  const div = document.createElement("div");
-  div.className = `message ${type}`;
-  div.innerText = text;
-  chat.appendChild(div);
-  chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
-}
+    const label = document.createElement("div");
+    label.className = "msg-label";
+    label.textContent = type === "user" ? "YOU" : "J.A.R.V.I.S";
 
-async function sendCommand() {
-  const input = document.getElementById("commandInput");
-  const command = input.value;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
 
-  if (!command) return;
+    wrap.appendChild(label);
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
 
-  addMessage("You: " + command, "user");
-  status.innerText = "🧠 Thinking...";
+    return bubble;
+  }
 
-  const res = await fetch("http://127.0.0.1:5000/command", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ command })
+  async function sendCommand() {
+    const input = document.getElementById("commandInput");
+    const command = input.value.trim();
+    if (!command) return;
+
+    addMessage(command, "user");
+    input.value = "";
+    setState("thinking");
+
+    const res = await fetch("http://127.0.0.1:5000/command", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command })
+    });
+
+    const data = await res.json();
+    addMessage(data.response, "jarvis");
+    setState("listening");
+  }
+
+  let started = false;
+
+  function startListening() {
+    if (started) return;
+    started = true;
+    addMessage("I'm online and ready. What can I do for you?", "jarvis");
+    setState("listening");
+    socket.emit("start_listening");
+  }
+
+  let currentBubble = null;
+  let currentText = "";
+
+  socket.on("jarvis_user", (data) => {
+    addMessage(data.command, "user");
+    setState("thinking");
   });
 
-  const data = await res.json();
-  addMessage("Jarvis: " + data.response, "jarvis");
+  socket.on("jarvis_chunk", (data) => {
+    if (!currentBubble) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg jarvis";
+      const label = document.createElement("div");
+      label.className = "msg-label";
+      label.textContent = "J.A.R.V.I.S";
+      currentBubble = document.createElement("div");
+      currentBubble.className = "bubble";
+      wrap.appendChild(label);
+      wrap.appendChild(currentBubble);
+      chat.appendChild(wrap);
+    }
+    currentText += data.chunk;
+    currentBubble.textContent = currentText;
+    chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
+    setState("speaking");
+  });
 
-  status.innerText = "🎤 Listening...";
-  input.value = "";
-}
+  socket.on("jarvis_done", () => {
+    currentBubble = null;
+    currentText = "";
+    setState("listening");
+  });
 
-let started = false;
-
-function startListening() {
-  if (started) return;
-  started = true;
-
-  addMessage("🎤 Jarvis activated", "jarvis");
-  status.innerText = "🎤 Listening...";
-  setState("listening");
-
-  socket.emit("start_listening");
-}
-
-let currentDiv = null;
-let currentText = "";
-
-socket.on("jarvis_user", (data) => {
-  addMessage("You: " + data.command, "user");
-  status.innerText = "🧠 Thinking...";
-  setState(""); // thinking mode (idle animation)
-});
-
-socket.on("jarvis_chunk", (data) => {
-  if (!currentDiv) {
-    currentDiv = document.createElement("div");
-    currentDiv.className = "message jarvis";
-    chat.appendChild(currentDiv);
+  function stopListening() {
+    started = false;
+    setState("idle");
+    socket.disconnect();
   }
 
-  currentText += data.chunk + " ";
-  currentDiv.innerText = "Jarvis: " + currentText;
-
-  chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
-  status.innerText = "💬 Responding...";
-  setState("speaking");
-});
-
-socket.on("jarvis_done", () => {
-  currentDiv = null;
-  currentText = "";
-  status.innerText = "🎤 Listening...";
-  setState("listening");
-});
-
-function stopListening() {
-  location.reload();
-}
-
-window.onload = startListening;
+  window.onload = startListening;
 </script>
 
 </body>

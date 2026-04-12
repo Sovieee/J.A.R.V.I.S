@@ -3,6 +3,7 @@ from commands.command_handler import handle_command
 from flask_socketio import SocketIO
 import time
 import random
+import threading
 import re
 from intelligence.context_state import set_conversation_mode
 from voice.voice_output import speak
@@ -37,16 +38,21 @@ def run_command():
 # -------------------------------
 @socketio.on("start_listening")
 def handle_listening():
+    thread = threading.Thread(target=_listening_loop)
+    thread.daemon = True
+    thread.start()
+
+def _listening_loop():
     from voice.wake_listener import listen_wake_word
 
     print("🎤 Listening started...")
 
     last_active_time = time.time()
     last_command = None
+
     while True:
         command = listen_wake_word()
 
-        # 🔹 Timeout → reset conversation mode
         if not command and (time.time() - last_active_time > 60):
             set_conversation_mode(False)
 
@@ -56,32 +62,23 @@ def handle_listening():
 
             print("[WAKE] Heard:", command)
 
-            # 🔹 SEND USER MESSAGE FIRST (UI update)
-            socketio.emit("jarvis_user", {
-                "command": command
-            })
+            socketio.emit("jarvis_user", {"command": command})
 
-            # 🔹 PROCESS COMMAND
             response = handle_command(command) or "Done"
 
             print("[STREAM] Sending response:", response)
 
-            # 🔹 STREAM RESPONSE WORD BY WORD
             if response and response.strip():
-                words = response.split()
-
                 chunks = re.findall(r'.{1,40}(?:\s|$)', response)
-
                 for chunk in chunks:
                     socketio.emit("jarvis_chunk", {"chunk": chunk})
-                    #speak(chunk)
                     socketio.sleep(0.08)
 
             if not response:
-                socketio.emit("jarvis_chunk", {"chunk": "Sorry, I didn’t understand."})
-                socketio.emit("jarvis_done")
-            # 🔹 SIGNAL END OF RESPONSE
+                socketio.emit("jarvis_chunk", {"chunk": "Sorry, I didn't understand."})
+
             socketio.emit("jarvis_done")
+
         socketio.sleep(0.5)
 
 # -------------------------------
