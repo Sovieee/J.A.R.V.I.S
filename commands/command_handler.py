@@ -1,5 +1,10 @@
 from intelligence.nlp import clean_command, detect_intent
-from commands.open_apps import open_chrome, open_notepad
+from commands.open_apps import (
+    open_chrome, open_notepad, open_spotify,
+    open_calculator, open_vscode, open_whatsapp,
+    open_file_explorer, open_netflix, open_prime_video,
+    open_word, open_excel, open_powerpoint, open_settings
+)
 from commands.web_search import search_google
 from intelligence.memory import set_preference, get_preference
 from intelligence.learning import log_activity, get_frequent_actions
@@ -89,14 +94,59 @@ def handle_command(command):
                 speak(message)
                 return message
 
-        # Direct commands
+       # Direct commands
         if "chrome" in command:
-            open_chrome()
-            return "Opening Chrome"
+            return open_chrome()
 
         if "notepad" in command:
-            open_notepad()
-            return "Opening Notepad"
+            return open_notepad()
+
+        if "spotify" in command:
+            return open_spotify()
+
+        if "calculator" in command or "calc" in command:
+            return open_calculator()
+
+        if "vs code" in command or "vscode" in command or "code" in command:
+            return open_vscode()
+
+        if "whatsapp" in command:
+            return open_whatsapp()
+
+        if "netflix" in command:
+            return open_netflix()
+
+        if "prime" in command or "amazon" in command:
+            return open_prime_video()
+
+        if "word" in command:
+            return open_word()
+
+        if "excel" in command:
+            return open_excel()
+
+        if "powerpoint" in command or "ppt" in command:
+            return open_powerpoint()
+
+        if "settings" in command:
+            return open_settings()
+
+        if "file explorer" in command or "explorer" in command or "files" in command:
+            # Check if user named a specific folder
+            if "downloads" in command:
+                return open_file_explorer(r"C:\Users\%USERNAME%\Downloads")
+            elif "documents" in command:
+                return open_file_explorer(r"C:\Users\%USERNAME%\Documents")
+            elif "desktop" in command:
+                return open_file_explorer(r"C:\Users\%USERNAME%\Desktop")
+            elif "pictures" in command:
+                return open_file_explorer(r"C:\Users\%USERNAME%\Pictures")
+            elif "music" in command:
+                return open_file_explorer(r"C:\Users\%USERNAME%\Music")
+            elif "videos" in command:
+                return open_file_explorer(r"C:\Users\%USERNAME%\Videos")
+            else:
+                return open_file_explorer()
 
     # 🔹 SEARCH
     elif intent == "search":
