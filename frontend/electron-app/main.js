@@ -6,14 +6,11 @@ function createWindow() {
     height: 600,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false   // 🔥 IMPORTANT
+      contextIsolation: false
     }
   });
 
   win.loadFile("index.html");
-
-  // 🔥 Open DevTools for debugging
-  win.webContents.openDevTools();
 }
 
 app.whenReady().then(createWindow);
