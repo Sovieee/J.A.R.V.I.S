@@ -6,20 +6,18 @@ from commands.open_apps import (
     open_word, open_excel, open_powerpoint, open_settings
 )
 from commands.web_search import search_google
-from intelligence.memory import set_preference, get_preference
-from intelligence.learning import log_activity, get_frequent_actions
+from intelligence.memory import set_preference, get_preference, save_fact, get_fact
+from intelligence.learning import log_activity, get_time_based_suggestion
 from voice.voice_output import speak
-from intelligence.learning import get_time_based_suggestion
-from intelligence.memory import save_fact, get_fact
 from intelligence.ai_brain import ask_ai
 from intelligence.context_memory import add_to_history
-import time
 from intelligence.context_state import (
     set_pending_intent,
     get_pending_intent,
     clear_pending_intent,
     set_conversation_mode
 )
+import time
 
 # 🔹 Store last suggestion
 last_suggestion = None
@@ -27,129 +25,170 @@ suggestion_rejected = False
 
 
 def handle_command(command):
-    
     global last_suggestion, suggestion_rejected
 
-     #  Clean first
+    # 🔹 Clean command
     command = clean_command(command)
 
-    #  Then check pending intent
-    pending = get_pending_intent()
+    # =========================
+    # 🧠 MEMORY LEARNING
+    # =========================
 
+    if "my name is" in command:
+        name = command.split("my name is")[-1].strip()
+        save_fact("name", name)
+        msg = f"Nice to meet you, {name}"
+        speak(msg)
+        return msg
+
+    if "call me" in command and not command.startswith("what"):
+        nickname = command.split("call me")[-1].strip()
+        save_fact("nickname", nickname)
+        msg = f"Got it. I will call you {nickname}"
+        speak(msg)
+        return msg
+
+    if "i like" in command:
+        thing = command.split("i like")[-1].strip()
+        save_fact("likes", thing)
+        msg = f"Got it, you like {thing}"
+        speak(msg)
+        return msg
+
+    if "i prefer" in command:
+        pref = command.split("i prefer")[-1].strip()
+        save_fact("preference", pref)
+        msg = f"Got it, you prefer {pref}"
+        speak(msg)
+        return msg
+
+    # =========================
+    # 🧠 MEMORY RECALL
+    # =========================
+
+    if "what do you call me" in command or "what is my name" in command:
+        nickname = get_fact("nickname")
+        name = get_fact("name")
+
+        if nickname:
+            msg = f"I call you {nickname}"
+        elif name:
+            msg = f"Your name is {name}"
+        else:
+            msg = "I don't know yet. What should I call you?"
+
+        speak(msg)
+        return msg
+
+    if "what do i like" in command:
+        like = get_fact("likes")
+        msg = f"You like {like}" if like else "I don't know your preferences yet"
+        speak(msg)
+        return msg
+
+    # =========================
+    # 🔄 PENDING INTENT
+    # =========================
+
+    pending = get_pending_intent()
     if pending == "search":
         clear_pending_intent()
         return search_google(command)
-    
+
+    # =========================
+    # 🎯 INTENT DETECTION
+    # =========================
+
     intent = detect_intent(command)
 
-    # 🔹 Log activity
     log_activity({
-    "intent": intent,
-    "command": command
-})
+        "intent": intent,
+        "command": command
+    })
 
-    # 🔍 Debug logs
-    print(f"[DEBUG] Cleaned Command: {command}")
-    print(f"[DEBUG] Detected Intent: {intent}")
+    print(f"[DEBUG] Command: {command}")
+    print(f"[DEBUG] Intent: {intent}")
 
-    # 🔹 Handle YES / NO for suggestions
+    # =========================
+    # 👍 YES / NO HANDLING
+    # =========================
+
     words = command.lower().split()
-    if any(word in words for word in ["yes", "yeah", "yep", "sure", "ok", "okay"]):
+
+    if any(w in words for w in ["yes", "yeah", "yep", "sure", "ok"]):
         if last_suggestion:
-            print(f"[DEBUG] Executing suggested command: {last_suggestion}")
             cmd = last_suggestion
             last_suggestion = None
             return handle_command(cmd)
 
-    words = command.lower().split()
-    if any(word in words for word in ["no", "nope", "nah", "don't", "dont"]):
+    if any(w in words for w in ["no", "nope", "nah", "dont", "don't"]):
         suggestion_rejected = True
         last_suggestion = None
-        message = "Okay, ignoring suggestion."
-        speak(message)
-        return message
+        msg = "Okay, ignoring suggestion."
+        speak(msg)
+        return msg
 
-    # 🔹 SET PREFERENCE
+    # =========================
+    # ⚙️ PREFERENCES
+    # =========================
+
     if "set browser to" in command:
         browser = command.split("set browser to")[-1].strip()
         set_preference("browser", browser)
-        message = f"Got it. I will use {browser} as your browser"
-        speak(message)
-        return message
+        msg = f"Got it. I will use {browser}"
+        speak(msg)
+        return msg
 
-    # 🔹 OPEN APP
+    # =========================
+    # 🖥️ OPEN APPS
+    # =========================
+
     if intent == "open_app":
 
-        # Use memory
         if "browser" in command:
             browser = get_preference("browser")
-            print(f"[DEBUG] Preferred Browser: {browser}")
 
             if browser == "chrome":
                 return open_chrome()
             elif browser == "notepad":
                 return open_notepad()
-            else:
-                message = "No browser preference set"
-                speak(message)
-                return message
 
-       # Direct commands
+            msg = "No browser preference set"
+            speak(msg)
+            return msg
+
         if "chrome" in command:
             return open_chrome()
-
         if "notepad" in command:
             return open_notepad()
-
         if "spotify" in command:
             return open_spotify()
-
         if "calculator" in command or "calc" in command:
             return open_calculator()
-
-        if "vs code" in command or "vscode" in command or "code" in command:
+        if "vscode" in command or "code" in command:
             return open_vscode()
-
         if "whatsapp" in command:
             return open_whatsapp()
-
         if "netflix" in command:
             return open_netflix()
-
-        if "prime" in command or "amazon" in command:
+        if "prime" in command:
             return open_prime_video()
-
         if "word" in command:
             return open_word()
-
         if "excel" in command:
             return open_excel()
-
         if "powerpoint" in command or "ppt" in command:
             return open_powerpoint()
-
         if "settings" in command:
             return open_settings()
 
-        if "file explorer" in command or "explorer" in command or "files" in command:
-            # Check if user named a specific folder
-            if "downloads" in command:
-                return open_file_explorer(r"C:\Users\%USERNAME%\Downloads")
-            elif "documents" in command:
-                return open_file_explorer(r"C:\Users\%USERNAME%\Documents")
-            elif "desktop" in command:
-                return open_file_explorer(r"C:\Users\%USERNAME%\Desktop")
-            elif "pictures" in command:
-                return open_file_explorer(r"C:\Users\%USERNAME%\Pictures")
-            elif "music" in command:
-                return open_file_explorer(r"C:\Users\%USERNAME%\Music")
-            elif "videos" in command:
-                return open_file_explorer(r"C:\Users\%USERNAME%\Videos")
-            else:
-                return open_file_explorer()
+        return open_file_explorer()
 
-    # 🔹 SEARCH
-    elif intent == "search":
+    # =========================
+    # 🔍 SEARCH
+    # =========================
+
+    if intent == "search":
         words = command.split()
 
         if len(words) > 1:
@@ -157,76 +196,41 @@ def handle_command(command):
             search_google(query)
             return f"Searching for {query}"
 
-        else:
-            set_pending_intent("search")
-            message = "What do you want me to search?"
-            speak(message)
-            return message
+        set_pending_intent("search")
+        msg = "What do you want me to search?"
+        speak(msg)
+        return msg
 
-    # 🔹 EXIT
-    elif intent == "exit":
-        set_conversation_mode(False)  # 🔥 turn off conversation mode
+    # =========================
+    # ❌ EXIT
+    # =========================
+
+    if intent == "exit":
+        set_conversation_mode(False)
         speak("Goodbye!")
         return "Goodbye!"
 
-            # 🔹 MEMORY LEARNING (store facts)
+    # =========================
+    # 🤖 AI FALLBACK
+    # =========================
 
-    if "my name is" in command:
-        name = command.split("my name is")[-1].strip()
-        save_fact("name", name)
-        message = f"Nice to meet you, {name}"
-        speak(message)
-        return message
-
-    if "i like" in command:
-        thing = command.split("i like")[-1].strip()
-        save_fact("likes", thing)
-        message = f"Got it, you like {thing}"
-        speak(message)
-        return message
-
-
-    # 🔹 MEMORY RECALL
-
-    if "what is my name" in command:
-        name = get_fact("name")
-        if name:
-            message = f"Your name is {name}"
-        else:
-            message = "I don't know your name yet"
-
-        speak(message)
-        return message
-
-    if "what do i like" in command:
-        like = get_fact("likes")
-        if like:
-            message = f"You like {like}"
-        else:
-            message = "I don't know your preferences yet"
-
-        speak(message)
-        return message
-
-    # 🔹 ADD USER TO MEMORY (IMPORTANT: lowercase roles)
     add_to_history("user", command)
 
-    # 🔹 AI RESPONSE
     ai_response = ask_ai(command)
 
-    # 🔹 ADD AI RESPONSE TO MEMORY
     if ai_response:
         add_to_history("assistant", ai_response)
 
-    # 🔹 SPEAK + RETURN (Fallback)
-    if ai_response and "AI brain is not connected" not in ai_response:
-        set_conversation_mode(True)  # 🔥 KEEP LISTENING
+    if ai_response and "offline" not in ai_response.lower():
+        set_conversation_mode(True)
         time.sleep(0.1)
         speak(ai_response)
         return ai_response
 
+    # =========================
+    # ⏰ SUGGESTIONS
+    # =========================
 
-    # 🔹 THEN TIME-AWARE SUGGESTION (only if AI fails)
     suggestion = get_time_based_suggestion()
 
     if suggestion and suggestion != command:
@@ -236,12 +240,14 @@ def handle_command(command):
         last_suggestion = suggestion
         suggestion_rejected = False
 
-        message = f"You usually do '{suggestion}' around this time. Want me to do it?"
-        speak(message)
-        return message
+        msg = f"You usually do '{suggestion}'. Want me to do it?"
+        speak(msg)
+        return msg
 
+    # =========================
+    # ❓ FINAL FALLBACK
+    # =========================
 
-    # 🔹 FINAL FALLBACK
-    final_msg = "Sorry, I don't understand that command."
-    speak(final_msg)
-    return final_msg
+    msg = "Sorry, I don't understand that command."
+    speak(msg)
+    return msg
