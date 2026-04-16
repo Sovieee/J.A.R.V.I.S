@@ -1,112 +1,159 @@
 // =======================
-// LOG SYSTEM
+// ELEMENTS
 // =======================
-let isTypingActive = true;
-const { ipcRenderer } = require("electron");
+const socket = io("http://127.0.0.1:5000");
 const logs = document.getElementById("logs");
 const aiText = document.getElementById("ai-text");
+const input = document.getElementById("command-input");
+const liveFeed = document.getElementById("live-feed");
 
-const logMessages = [
-  "Initializing core systems...",
-  "Loading neural modules...",
-  "Establishing secure connection...",
-  "Scanning environment...",
-  "Accessing global database...",
-  "Monitoring network traffic...",
-  "Running diagnostics..."
-];
-
-function addLog(message) {
+// =======================
+// LOG SYSTEM
+// =======================
+function addLog(msg) {
   const p = document.createElement("p");
-  p.textContent = "> " + message;
+  p.textContent = "> " + msg;
   logs.appendChild(p);
   logs.scrollTop = logs.scrollHeight;
 }
 
+// =======================
+// LIVE FEED
+// =======================
+function addFeed(msg) {
+  const p = document.createElement("p");
+  p.textContent = "> " + msg;
+  liveFeed.appendChild(p);
+  liveFeed.scrollTop = liveFeed.scrollHeight;
+}
+
+// =======================
+// RANDOM SYSTEM LOGS
+// =======================
 setInterval(() => {
-  const msg = logMessages[Math.floor(Math.random() * logMessages.length)];
-  addLog(msg);
-}, 1200);
-
+  const msgs = [
+    "Scanning environment...",
+    "Connecting to network...",
+    "Loading modules...",
+    "Running diagnostics...",
+    "Accessing global database...",
+    "Monitoring traffic..."
+  ];
+  addLog(msgs[Math.floor(Math.random() * msgs.length)]);
+}, 1500);
 
 // =======================
-// AI TYPING EFFECT
+// TYPING EFFECT
 // =======================
-const sentences = [
-  "System online.",
-  "All modules functioning.",
-  "Awaiting your command..."
-];
+function typeResponse(text) {
+  aiText.textContent = "";
+  let i = 0;
 
-let index = 0;
+  function typing() {
+    if (i < text.length) {
+      aiText.textContent += text.charAt(i);
+      i++;
+      setTimeout(typing, 15); // typing speed
+    }
+  }
 
-function typeText(text, i = 0) {
-  if (!isTypingActive) return; // 🔥 STOP if disabled
+  typing();
+}
 
-  if (i < text.length) {
-    aiText.textContent = text.slice(0, i + 1);
-    setTimeout(() => typeText(text, i + 1), 40);
-  } else {
-    setTimeout(() => {
-      index = (index + 1) % sentences.length;
-      typeText(sentences[index]);
-    }, 2000);
+async function askJarvis(command) {
+  try {
+    const res = await fetch("http://127.0.0.1:5000/command", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ command }),
+    });
+
+    const data = await res.json();
+    return data.response || "No response";
+
+  } catch (err) {
+    console.error(err);
+    return "⚠️ Backend not reachable";
   }
 }
 
-typeText(sentences[0]);
+// =======================
+// COMMAND HANDLER
+// =======================
+if (input) {
+  input.addEventListener("keydown", async (e) => {
+    if (e.key === "Enter") {
+      const command = input.value.trim();
+      if (!command) return;
 
+      input.value = "";
+
+      addLog("User: " + command);
+
+      // Live feed simulation
+      addFeed("Analyzing command...");
+      setTimeout(() => addFeed("Understanding intent..."), 300);
+      setTimeout(() => addFeed("Generating response..."), 600);
+
+      aiText.textContent = "Thinking...";
+
+      try {
+        const response = await askJarvis(command);
+        typeResponse(response);
+      } catch (err) {
+        console.error(err);
+        aiText.textContent = "Error connecting to JARVIS.";
+      }
+    }
+  });
+}
 
 // =======================
 // SYSTEM STATS
 // =======================
 setInterval(() => {
-  document.getElementById("cpu").textContent =
-    Math.floor(Math.random() * 100) + "%";
+  const cpu = Math.floor(Math.random() * 100);
+  const ram = Math.floor(Math.random() * 100);
 
-  document.getElementById("ram").textContent =
-    Math.floor(Math.random() * 100) + "%";
+  const cpuEl = document.getElementById("cpu");
+  const ramEl = document.getElementById("ram");
+
+  if (cpuEl) cpuEl.textContent = cpu + "%";
+  if (ramEl) ramEl.textContent = ram + "%";
 }, 1500);
 
-
 // =======================
-// 🌍 LEAFLET MAP (FIXED)
+// MAP (LEAFLET)
 // =======================
 window.addEventListener("DOMContentLoaded", () => {
-
   if (typeof L === "undefined") {
     console.error("Leaflet not loaded ❌");
     return;
   }
 
-  const mapElement = document.getElementById("map");
+  const mapEl = document.getElementById("map");
+  if (!mapEl) return;
 
-  if (!mapElement) {
-    console.error("Map container not found ❌");
-    return;
-  }
-
-  const map = L.map('map', {
+  const map = L.map("map", {
     zoomControl: false,
     attributionControl: false
   }).setView([20, 0], 2);
 
   L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    {
-      subdomains: 'abcd',
-      maxZoom: 19
-    }
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    { subdomains: "abcd", maxZoom: 19 }
   ).addTo(map);
 
-  // 🔥 Animated activity pings
+  // Animated pings
   function addPing() {
     const lat = (Math.random() * 140) - 70;
     const lng = (Math.random() * 360) - 180;
 
     const circle = L.circle([lat, lng], {
-      color: '#00f7ff',
-      fillColor: '#00f7ff',
+      color: "#00f7ff",
+      fillColor: "#00f7ff",
       fillOpacity: 0.5,
       radius: 200000
     }).addTo(map);
@@ -118,8 +165,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
   setInterval(addPing, 1500);
 });
+
 // =======================
-// 📊 LIVE GRAPH SYSTEM
+// GRAPH (CHART.JS)
 // =======================
 const ctx = document.getElementById("chart");
 
@@ -150,9 +198,7 @@ if (ctx) {
       animation: false,
       plugins: {
         legend: {
-          labels: {
-            color: "#00f7ff"
-          }
+          labels: { color: "#00f7ff" }
         }
       },
       scales: {
@@ -170,7 +216,6 @@ if (ctx) {
     }
   });
 
-  // Update graph in real-time
   setInterval(() => {
     const time = new Date().toLocaleTimeString();
 
@@ -189,54 +234,22 @@ if (ctx) {
     chart.update();
   }, 1500);
 }
-
+socket.emit("start_listening");
 // =======================
-// 🤖 COMMAND SYSTEM
+// USER VOICE INPUT
 // =======================
-const input = document.getElementById("command-input");
-
-if (input) {
-  input.addEventListener("keydown", async (e) => {
-  if (e.key === "Enter") {
-
-    isTypingActive = false; // 🔥 STOP animation
-
-    const command = input.value;
-    input.value = "";
-
-    addLog("User: " + command);
-    addFeed("Analyzing command...");
-    setTimeout(() => addFeed("Understanding intent..."), 300);
-    setTimeout(() => addFeed("Generating response..."), 600);
-
-    aiText.textContent = "Thinking...";
-
-    const response = await ipcRenderer.invoke("ask-ai", command);
-
-    typeResponse(response);
-  }
+socket.on("jarvis_user", (data) => {
+  addLog("User (voice): " + data.command);
 });
-}
-function typeResponse(text) {
-  let i = 0;
-  aiText.textContent = "";
-
-  function type() {
-    if (i < text.length) {
-      aiText.textContent += text.charAt(i);
-      aiText.scrollTop = aiText.scrollHeight; // auto-scroll
-      i++;
-      setTimeout(type, 10); // speed (lower = faster)
-    }
-  }
-
-  type();
-}
-const liveFeed = document.getElementById("live-feed");
-
-function addFeed(msg) {
-  const p = document.createElement("p");
-  p.textContent = "> " + msg;
-  liveFeed.appendChild(p);
-  liveFeed.scrollTop = liveFeed.scrollHeight;
-}
+// =======================
+// STREAMED RESPONSE (chunk by chunk)
+// =======================
+socket.on("jarvis_chunk", (data) => {
+  aiText.textContent += data.chunk;
+});
+// =======================
+// RESPONSE COMPLETE
+// =======================
+socket.on("jarvis_done", () => {
+  addFeed("Response complete.");
+});
