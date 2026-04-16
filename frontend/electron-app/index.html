@@ -60,17 +60,39 @@
       <h2 class="glow mb-2">SYSTEM LOGS</h2>
     </div>
 
-    <!-- RIGHT: GLOBAL DATA -->
-    <div class="col-span-3 row-span-3 panel p-3">
-      <h2 class="glow mb-2">GLOBAL DATA</h2>
-      <div id="map" class="h-[90%] w-full mt-2 rounded"></div>
-    </div>
+    <!-- RIGHT SIDE CONTAINER -->
+<div class="col-span-3 row-span-6 flex flex-col gap-2">
 
-    <!-- RIGHT: LIVE FEED -->
-    <div class="col-span-3 row-span-3 panel p-3">
-      <h2 class="glow mb-2">LIVE FEED</h2>
-      <div id="live-feed" class="text-xs opacity-70 h-full overflow-y-auto"></div>
-    </div>
+  <!-- GLOBAL DATA -->
+  <div class="panel p-3 flex-1">
+    <h2 class="glow mb-2">GLOBAL DATA</h2>
+    <div id="map" class="h-full w-full rounded"></div>
+  </div>
+
+  <!-- LIVE FEED -->
+  <div class="panel p-3 flex-1 overflow-hidden">
+    <h2 class="glow mb-2">LIVE FEED</h2>
+    <div id="live-feed" class="text-xs opacity-70 h-full overflow-y-auto"></div>
+  </div>
+
+  <!-- WEATHER -->
+<div class="panel p-3 flex-1">
+    <h2 class="glow mb-2">WEATHER</h2>
+    <div id="weather-icon" class="text-4xl mb-2 glow"></div>
+
+    <div id="weather-box" class="flex flex-col justify-center items-center h-full text-center">
+
+  <div id="weather-city" class="text-lg glow">Detecting...</div>
+
+  <div id="weather-temp" class="text-3xl mt-2">--°C</div>
+
+  <div id="weather-desc" class="text-xs opacity-70 mt-1">--</div>
+
+</div>
+
+  </div>
+
+</div>
 
     <!-- CENTER: AI CORE -->
     <div class="col-span-6 row-span-4 panel flex flex-col items-center justify-center text-center p-4 overflow-hidden">

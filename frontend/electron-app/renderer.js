@@ -1,12 +1,16 @@
 // =======================
 // ELEMENTS
 // =======================
+const { ipcRenderer } = require("electron");
 const socket = io("http://127.0.0.1:5000");
 const logs = document.getElementById("logs");
 const aiText = document.getElementById("ai-text");
 const input = document.getElementById("command-input");
 const liveFeed = document.getElementById("live-feed");
-
+const weatherIcon = document.getElementById("weather-icon");
+const weatherCity = document.getElementById("weather-city");
+const weatherTemp = document.getElementById("weather-temp");
+const weatherDesc = document.getElementById("weather-desc");
 // =======================
 // LOG SYSTEM
 // =======================
@@ -253,3 +257,111 @@ socket.on("jarvis_chunk", (data) => {
 socket.on("jarvis_done", () => {
   addFeed("Response complete.");
 });
+
+// =======================
+// WEATHER FUNCTION
+// =======================
+
+// 🔹 ICON FUNCTION (clean & global)
+function getWeatherIcon(main) {
+  switch (main.toLowerCase()) {
+    case "clear": return "☀️";
+    case "clouds": return "☁️";
+    case "rain": return "🌧️";
+    case "drizzle": return "🌦️";
+    case "thunderstorm": return "⛈️";
+    case "snow": return "❄️";
+    case "mist":
+    case "fog":
+    case "haze": return "🌫️";
+    default: return "🌍";
+  }
+}
+
+// 🔹 MAIN WEATHER LOADER
+async function loadWeather(lat, lon) {
+  try {
+    const apiKey = await ipcRenderer.invoke("get-weather-key");
+
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
+    );
+
+    const data = await res.json();
+
+    if (data.cod !== 200) {
+      throw new Error(data.message);
+    }
+
+    // =========================
+    // UI UPDATE (SAFE)
+    // =========================
+    if (weatherCity) weatherCity.textContent = data.name;
+    if (weatherTemp) weatherTemp.textContent = Math.round(data.main.temp) + "°C";
+    if (weatherDesc) weatherDesc.textContent = data.weather[0].description;
+
+    // =========================
+    // ICON UPDATE (FIXED)
+    // =========================
+    if (weatherIcon) {
+      const main = data.weather[0].main;
+      weatherIcon.textContent = getWeatherIcon(main);
+    }
+
+    // =========================
+    // INTELLIGENCE LAYER
+    // =========================
+    const temp = Math.round(data.main.temp);
+    const condition = data.weather[0].main.toLowerCase();
+
+    if (temp > 30) addLog("🌡️ It's quite hot outside.");
+    if (condition.includes("rain")) addLog("🌧️ Carry an umbrella.");
+    if (condition.includes("cloud")) addLog("☁️ Cloudy weather detected.");
+
+  } catch (err) {
+    console.error("Weather error:", err);
+
+    if (weatherCity) weatherCity.textContent = "Weather unavailable";
+    if (weatherTemp) weatherTemp.textContent = "--°C";
+    if (weatherDesc) weatherDesc.textContent = "--";
+    if (weatherIcon) weatherIcon.textContent = "⚠️";
+  }
+}
+
+// =======================
+// USER LOCATION FOR WEATHER
+// =======================
+
+function initWeather() {
+  if (!navigator.geolocation) {
+    if (weatherCity) weatherCity.textContent = "Location not supported";
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      loadWeather(pos.coords.latitude, pos.coords.longitude);
+    },
+    (err) => {
+      console.warn("Location denied:", err.message);
+      if (weatherCity) weatherCity.textContent = "Location denied";
+    }
+  );
+}
+
+// 🔁 Refresh every 5 minutes
+setInterval(() => {
+  if (!navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      loadWeather(pos.coords.latitude, pos.coords.longitude);
+    },
+    (err) => {
+      console.warn("Location error:", err.message);
+    }
+  );
+}, 300000);
+
+// 🚀 Init on load
+window.addEventListener("DOMContentLoaded", initWeather);
