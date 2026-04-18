@@ -31,6 +31,7 @@ package-lock.json
 # ----------------------
 activity_log.json
 memory.json
+spotify_tokens.json
 
 # ----------------------
 # 🔐 Environment / Secrets
