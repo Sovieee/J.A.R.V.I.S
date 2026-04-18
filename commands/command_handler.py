@@ -1,161 +1,234 @@
-from intelligence.nlp import clean_command, detect_intent
+import re
+import time
+
 from commands.open_apps import (
-    open_chrome, open_notepad, open_spotify,
-    open_calculator, open_vscode, open_whatsapp,
-    open_file_explorer, open_netflix, open_prime_video,
-    open_word, open_excel, open_powerpoint, open_settings
+    open_calculator,
+    open_chrome,
+    open_excel,
+    open_file_explorer,
+    open_netflix,
+    open_notepad,
+    open_powerpoint,
+    open_prime_video,
+    open_settings,
+    open_spotify,
+    open_vscode,
+    open_whatsapp,
+    open_word,
 )
+from commands.smart_actions import (
+    calculate_expression,
+    extract_location,
+    extract_reminder_details,
+    get_time_response,
+    get_weather_response,
+    handle_media_command,
+    normalize_follow_up_text,
+    schedule_reminder,
+)
+from commands.spotify_player import play_spotify_request
 from commands.web_search import search_google
-from intelligence.memory import set_preference, get_preference, save_fact, get_fact
-from intelligence.learning import log_activity, get_time_based_suggestion
-from voice.voice_output import speak
 from intelligence.ai_brain import ask_ai
 from intelligence.context_memory import add_to_history
 from intelligence.context_state import (
-    set_pending_intent,
-    get_pending_intent,
     clear_pending_intent,
-    set_conversation_mode
+    get_pending_intent,
+    set_conversation_mode,
+    set_pending_intent,
 )
-import time
+from intelligence.learning import get_time_based_suggestion, log_activity
+from intelligence.memory import get_fact, get_preference, save_fact, set_preference
+from intelligence.nlp import clean_command, detect_intent
+from voice.voice_output import speak
 
-# 🔹 Store last suggestion
+
 last_suggestion = None
 suggestion_rejected = False
+
+
+def respond(message):
+    speak(message)
+    return message
+
+
+def get_pending_name(pending_intent):
+    if isinstance(pending_intent, dict):
+        return pending_intent.get("intent")
+
+    return pending_intent
+
+
+def complete_reminder(details):
+    message = details.get("message")
+    delay_seconds = details.get("delay_seconds")
+    due_text = details.get("due_text")
+
+    if message and delay_seconds is not None:
+        schedule_reminder(message, delay_seconds)
+        clear_pending_intent()
+
+        if due_text:
+            return respond(f"Okay. I will remind you to {message} {due_text}.")
+
+        return respond(f"Okay. I will remind you to {message}.")
+
+    if message and delay_seconds is None:
+        set_pending_intent({
+            "intent": "reminder",
+            "message": message,
+        })
+        return respond(f"Sure. When should I remind you to {message}?")
+
+    if delay_seconds is not None and not message:
+        set_pending_intent({
+            "intent": "reminder",
+            "delay_seconds": delay_seconds,
+            "due_text": due_text,
+        })
+        return respond("Sure. What should I remind you about?")
+
+    set_pending_intent({"intent": "reminder"})
+    return respond("What should I remind you about, and when?")
+
+
+def handle_pending_intent(command):
+    pending_intent = get_pending_intent()
+    pending_name = get_pending_name(pending_intent)
+
+    if not pending_name:
+        return None
+
+    if pending_name == "search":
+        clear_pending_intent()
+        return search_google(command)
+
+    if pending_name == "weather":
+        location = extract_location(command) or normalize_follow_up_text(command)
+        if not location:
+            return respond("Which city should I check the weather for?")
+
+        clear_pending_intent()
+        weather_response = get_weather_response(location)
+
+        if weather_response:
+            return respond(weather_response)
+
+        search_google(f"weather in {location}")
+        return f"Searching weather for {location}"
+
+    if pending_name == "time":
+        location = extract_location(command) or normalize_follow_up_text(command)
+        if not location:
+            return respond("Which city or timezone should I use?")
+
+        clear_pending_intent()
+        time_response = get_time_response(command, location=location)
+
+        if time_response:
+            return respond(time_response)
+
+        search_google(f"current time in {location}")
+        return f"Searching current time in {location}"
+
+    if pending_name == "reminder":
+        details = extract_reminder_details(
+            command,
+            pending_intent if isinstance(pending_intent, dict) else None,
+        )
+        return complete_reminder(details)
+
+    return None
 
 
 def handle_command(command):
     global last_suggestion, suggestion_rejected
 
-    # 🔹 Clean command
     command = clean_command(command)
 
-    # =========================
-    # 🧠 MEMORY LEARNING
-    # =========================
+    if not command:
+        return respond("I did not catch that. Try saying it once more.")
 
     if "my name is" in command:
         name = command.split("my name is")[-1].strip()
         save_fact("name", name)
-        msg = f"Nice to meet you, {name}"
-        speak(msg)
-        return msg
+        return respond(f"Nice to meet you, {name}")
 
     if "call me" in command and not command.startswith("what"):
         nickname = command.split("call me")[-1].strip()
         save_fact("nickname", nickname)
-        msg = f"Got it. I will call you {nickname}"
-        speak(msg)
-        return msg
+        return respond(f"Got it. I will call you {nickname}")
 
     if "i like" in command:
         thing = command.split("i like")[-1].strip()
         save_fact("likes", thing)
-        msg = f"Got it, you like {thing}"
-        speak(msg)
-        return msg
+        return respond(f"Got it, you like {thing}")
 
     if "i prefer" in command:
         pref = command.split("i prefer")[-1].strip()
         save_fact("preference", pref)
-        msg = f"Got it, you prefer {pref}"
-        speak(msg)
-        return msg
-
-    # =========================
-    # 🧠 MEMORY RECALL
-    # =========================
+        return respond(f"Got it, you prefer {pref}")
 
     if "what do you call me" in command or "what is my name" in command:
         nickname = get_fact("nickname")
         name = get_fact("name")
 
         if nickname:
-            msg = f"I call you {nickname}"
-        elif name:
-            msg = f"Your name is {name}"
-        else:
-            msg = "I don't know yet. What should I call you?"
+            return respond(f"I call you {nickname}")
 
-        speak(msg)
-        return msg
+        if name:
+            return respond(f"Your name is {name}")
+
+        return respond("I do not know yet. What should I call you?")
 
     if "what do i like" in command:
         like = get_fact("likes")
-        msg = f"You like {like}" if like else "I don't know your preferences yet"
-        speak(msg)
-        return msg
+        if like:
+            return respond(f"You like {like}")
 
-    # =========================
-    # 🔄 PENDING INTENT
-    # =========================
+        return respond("I do not know your preferences yet.")
 
-    pending = get_pending_intent()
-    if pending == "search":
-        clear_pending_intent()
-        return search_google(command)
-
-    # =========================
-    # 🎯 INTENT DETECTION
-    # =========================
+    pending_response = handle_pending_intent(command)
+    if pending_response is not None:
+        return pending_response
 
     intent = detect_intent(command)
 
     log_activity({
         "intent": intent,
-        "command": command
+        "command": command,
     })
 
     print(f"[DEBUG] Command: {command}")
     print(f"[DEBUG] Intent: {intent}")
 
-    # =========================
-    # 👍 YES / NO HANDLING
-    # =========================
+    words = command.split()
 
-    words = command.lower().split()
-
-    if any(w in words for w in ["yes", "yeah", "yep", "sure", "ok"]):
+    if intent == "affirm" or any(word in words for word in ["yes", "yeah", "yep", "sure", "ok", "okay"]):
         if last_suggestion:
-            cmd = last_suggestion
+            suggestion = last_suggestion
             last_suggestion = None
-            return handle_command(cmd)
+            return handle_command(suggestion)
 
-    if any(w in words for w in ["no", "nope", "nah", "dont", "don't"]):
+    if intent == "decline" or any(word in words for word in ["no", "nope", "nah", "dont", "don't", "cancel"]):
         suggestion_rejected = True
         last_suggestion = None
-        msg = "Okay, ignoring suggestion."
-        speak(msg)
-        return msg
-
-    # =========================
-    # ⚙️ PREFERENCES
-    # =========================
+        return respond("Okay, ignoring suggestion.")
 
     if "set browser to" in command:
         browser = command.split("set browser to")[-1].strip()
         set_preference("browser", browser)
-        msg = f"Got it. I will use {browser}"
-        speak(msg)
-        return msg
-
-    # =========================
-    # 🖥️ OPEN APPS
-    # =========================
+        return respond(f"Got it. I will use {browser}")
 
     if intent == "open_app":
-
         if "browser" in command:
             browser = get_preference("browser")
 
             if browser == "chrome":
                 return open_chrome()
-            elif browser == "notepad":
+            if browser == "notepad":
                 return open_notepad()
 
-            msg = "No browser preference set"
-            speak(msg)
-            return msg
+            return respond("No browser preference is set.")
 
         if "chrome" in command:
             return open_chrome()
@@ -184,38 +257,72 @@ def handle_command(command):
 
         return open_file_explorer()
 
-    # =========================
-    # 🔍 SEARCH
-    # =========================
-
     if intent == "search":
-        words = command.split()
+        query = re.sub(r"^(search|google|look up|find)\s+", "", command).strip()
 
-        if len(words) > 1:
-            query = " ".join(words[1:])
+        if query:
             search_google(query)
             return f"Searching for {query}"
 
         set_pending_intent("search")
-        msg = "What do you want me to search?"
-        speak(msg)
-        return msg
+        return respond("What do you want me to search?")
 
-    # =========================
-    # ❌ EXIT
-    # =========================
+    if intent == "weather":
+        location = extract_location(command)
+
+        if location:
+            weather_response = get_weather_response(location)
+            if weather_response:
+                return respond(weather_response)
+
+            search_google(f"weather in {location}")
+            return f"Searching weather for {location}"
+
+        set_pending_intent({"intent": "weather"})
+        return respond("Which city should I check the weather for?")
+
+    if intent == "time":
+        needs_location = bool(re.search(r"\b(?:time|date|day)\s+in\s*$", command))
+        if needs_location:
+            set_pending_intent({"intent": "time"})
+            return respond("Which city or timezone should I use?")
+
+        location = extract_location(command)
+        time_response = get_time_response(command, location=location)
+
+        if time_response:
+            return respond(time_response)
+
+        if location:
+            search_google(f"current time in {location}")
+            return f"Searching current time in {location}"
+
+        return respond("I could not work out the time request.")
+
+    if intent == "arithmetic":
+        try:
+            result = calculate_expression(command)
+            return respond(f"The answer is {result}.")
+        except Exception:
+            return respond("I could not solve that calculation yet.")
+
+    if intent == "reminder":
+        reminder_details = extract_reminder_details(command)
+        return complete_reminder(reminder_details)
+
+    if intent == "play_music":
+        return respond(play_spotify_request(command))
+
+    if intent == "media_control":
+        media_response = handle_media_command(command)
+        return respond(media_response)
 
     if intent == "exit":
+        clear_pending_intent()
         set_conversation_mode(False)
-        speak("Goodbye!")
-        return "Goodbye!"
-
-    # =========================
-    # 🤖 AI FALLBACK
-    # =========================
+        return respond("Goodbye!")
 
     add_to_history("user", command)
-
     ai_response = ask_ai(command)
 
     if ai_response:
@@ -227,27 +334,15 @@ def handle_command(command):
         speak(ai_response)
         return ai_response
 
-    # =========================
-    # ⏰ SUGGESTIONS
-    # =========================
-
     suggestion = get_time_based_suggestion()
 
     if suggestion and suggestion != command:
         if suggestion == last_suggestion and suggestion_rejected:
-            return "Sorry, I don't understand that command."
+            return respond("Sorry, I do not understand that command.")
 
         last_suggestion = suggestion
         suggestion_rejected = False
 
-        msg = f"You usually do '{suggestion}'. Want me to do it?"
-        speak(msg)
-        return msg
+        return respond(f"You usually do '{suggestion}'. Want me to do it?")
 
-    # =========================
-    # ❓ FINAL FALLBACK
-    # =========================
-
-    msg = "Sorry, I don't understand that command."
-    speak(msg)
-    return msg
+    return respond("Sorry, I do not understand that command.")
