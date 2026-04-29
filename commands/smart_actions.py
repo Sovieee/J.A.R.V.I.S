@@ -208,6 +208,21 @@ def get_weather_response(location):
         f"The temperature is {temp} degrees Celsius and feels like {feels_like}.{humidity_text}"
     )
 
+def get_current_location():
+    try:
+        with urlopen("http://ip-api.com/json/", timeout=5) as response:
+            data = json.load(response)
+
+        return {
+            "city": data.get("city"),
+            "lat": data.get("lat"),
+            "lon": data.get("lon"),
+            "country": data.get("country"),
+        }
+
+    except Exception:
+        return None
+
 
 def _safe_eval(node):
     if isinstance(node, ast.Expression):
