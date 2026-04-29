@@ -229,6 +229,32 @@ def handle_command(command):
         set_preference("browser", browser)
         return respond(f"Got it. I will use {browser}")
 
+    # =======================
+    # CAMERA CONTROLS (FIXED ORDER)
+    # =======================
+
+    cmd = command.lower()
+
+    # CLOSE CAMERA
+    if ("close" in cmd or "stop" in cmd) and "camera" in cmd:
+        return {"action": "close_camera"}
+
+    # STOP RECORDING
+    if "stop recording" in cmd:
+        return {"action": "stop_recording"}
+
+    # RECORD VIDEO
+    if "record" in cmd:
+        return {"action": "record_video"}
+
+    # TAKE PHOTO
+    if ("take" in cmd or "click" in cmd) and ("photo" in cmd or "picture" in cmd):
+        return {"action": "capture_photo"}
+
+    # OPEN CAMERA
+    if "camera" in cmd:
+        return {"action": "open_camera"}
+
     if intent == "open_app":
         if "browser" in command:
             browser = get_preference("browser")
@@ -331,18 +357,23 @@ def handle_command(command):
         clear_pending_intent()
         set_conversation_mode(False)
         return respond("Goodbye!")
+    # =======================
+    # FINAL AI FALLBACK (FIX)
+    # =======================
 
     add_to_history("user", command)
     ai_response = ask_ai(command)
 
     if ai_response:
         add_to_history("assistant", ai_response)
-
-    if ai_response and "offline" not in ai_response.lower():
         set_conversation_mode(True)
         time.sleep(0.1)
         speak(ai_response)
         return ai_response
+    
+    # =======================
+    # SUGGESTION (OPTIONAL)
+    # =======================
 
     suggestion = get_time_based_suggestion()
 

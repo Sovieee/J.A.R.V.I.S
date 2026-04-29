@@ -34,6 +34,14 @@ def build_memory_context():
 def ask_ai(prompt):
     try:
         messages = []
+        from intelligence.context_state import get_context
+
+        location = get_context("location")
+
+        if location:
+            location_text = f"User is currently in {location.get('city')}."
+        else:
+            location_text = "User location is unknown."
 
         # 🔥 Inject MEMORY into system prompt
         memory_context = build_memory_context()
@@ -44,6 +52,7 @@ def ask_ai(prompt):
                 "You are J.A.R.V.I.S, a smart, witty, and slightly sarcastic AI assistant. "
                 "Keep responses concise, helpful, and confident.\n\n"
                 f"{memory_context}\n"
+                f"{location_text}\n"
                 "Use this information naturally when relevant."
             )
         })
