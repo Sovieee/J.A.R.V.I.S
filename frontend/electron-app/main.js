@@ -19,13 +19,38 @@ function createWindow() {
     },
   });
 
-  // ✅ allow geolocation
+  // ✅ SINGLE permission handler (FIXED)
   win.webContents.session.setPermissionRequestHandler((wc, permission, callback) => {
-    if (permission === "geolocation") callback(true);
-    else callback(false);
+    console.log("Permission requested:", permission); // 🔍 debug log
+
+    if (
+      permission === "media" ||       // camera + mic
+      permission === "camera" ||
+      permission === "microphone" ||
+      permission === "geolocation"
+    ) {
+      callback(true);
+    } else {
+      callback(false);
+    }
   });
 
   win.loadFile("index.html");
 }
 
+// App ready
 app.whenReady().then(createWindow);
+
+// Quit on all windows closed (Windows/Linux)
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+
+// macOS behavior
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});

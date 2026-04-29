@@ -44,9 +44,13 @@ def run_command():
     if command:
         response = handle_command(command) or "Done"
 
+        # 🔥 If it's an action dict → send directly
+        if isinstance(response, dict):
+            return jsonify(response)
+
         return jsonify({
             "status": "success",
-            "response": response if response else "Done",
+            "response": response
         })
 
     return jsonify({"status": "error"})
@@ -81,6 +85,17 @@ def spotify_callback():
         )
     except Exception as exc:
         return spotify_callback_page(False, str(exc)), 400
+    
+@app.route("/update-context", methods=["POST"])
+def update_context():
+    data = request.json
+
+    from intelligence.context_state import set_context
+    print("🔥 LOCATION RECEIVED:", data)
+    if "location" in data:
+        set_context("location", data["location"])
+
+    return jsonify({"status": "ok"})
 
 
 @app.route("/spotify/status", methods=["GET"])

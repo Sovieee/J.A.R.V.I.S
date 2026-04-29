@@ -2,6 +2,16 @@
 conversation_mode = False
 pending_intent = None
 
+# 🔹 Generic context storage
+context_data = {}
+
+def set_context(key, value):
+    global context_data
+    context_data[key] = value
+
+def get_context(key):
+    return context_data.get(key)
+
 
 # ------------------------
 # 🔹 Conversation Mode

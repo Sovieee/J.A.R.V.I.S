@@ -69,6 +69,15 @@
     <div id="map" class="h-full w-full rounded"></div>
   </div>
 
+  <div id="camera-container" class="hidden flex flex-col items-center mt-2">
+  <video id="camera" autoplay playsinline class="w-full rounded"></video>
+  <div class="flex gap-2 mt-2">
+    <button id="capture-btn">📸 Capture</button>
+    <button id="record-btn">🎥 Record</button>
+    <button id="stop-btn">⏹ Stop</button>
+  </div>
+</div>
+
   <!-- LIVE FEED -->
   <div class="panel p-3 flex-1 overflow-hidden">
     <h2 class="glow mb-2">LIVE FEED</h2>

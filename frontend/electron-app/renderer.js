@@ -116,7 +116,7 @@ async function askJarvis(command) {
     });
 
     const data = await res.json();
-    return data.response || "No response";
+    return data;
 
   } catch (err) {
     console.error(err);
@@ -145,13 +145,58 @@ if (input) {
       aiText.textContent = "Thinking...";
 
       try {
+        // ensure location is set before AI call
+        const location = await getUserLocation();
+
+        if (location) {
+          await fetch("http://127.0.0.1:5000/update-context", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              location: {
+                city: document.getElementById("weather-city")?.textContent || "Unknown",
+                lat: location.lat,
+                lon: location.lon
+              }
+            })
+          });
+        }
+
         const response = await askJarvis(command);
+        console.log("Backend response:", response);
+
+        // 🔥 HANDLE ACTIONS FROM BACKEND
+        if (response.action === "open_camera") {
+          startCamera();
+        }
+
+        if (response.action === "capture_photo") {
+          startCamera();
+          setTimeout(capturePhoto, 500);
+        }
+
+        if (response.action === "record_video") {
+          startCamera();
+          setTimeout(startRecording, 500);
+        }
+
+        if (response.action === "stop_recording") {
+          stopRecording();
+        }
+
+        if (response.action === "close_camera") {
+          stopCamera();
+        }
+
         typeResponse(response);
+
       } catch (err) {
         console.error(err);
         aiText.textContent = "Error connecting to JARVIS.";
       }
-    }
+       }
   });
 }
 
@@ -218,6 +263,22 @@ window.addEventListener("DOMContentLoaded", () => {
 
     addLog(`📍 Location via ${source}`);
 
+    fetch("http://127.0.0.1:5000/update-context", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        location: {
+          city: document.getElementById("weather-city")?.textContent || "Unknown",
+          lat: location.lat,
+          lon: location.lon
+        }
+      })
+    })
+    .then(res => res.json())
+    .then(data => console.log("✅ Context updated:", data))
+    .catch(err => console.error("❌ Context error:", err));
     },
     (err) => {
       console.warn("Location error:", err.message);
@@ -428,5 +489,111 @@ setInterval(async () => {
 
 }, 300000);
 
+// Camera Options
+
+let stream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+    const video = document.getElementById("camera");
+    video.srcObject = stream;
+
+    document.getElementById("camera-container").classList.remove("hidden");
+
+    addLog("📷 Camera started");
+
+  } catch (err) {
+    console.error(err);
+    addLog("❌ Camera access denied");
+  }
+}
+
+// Capture Photos
+
+function capturePhoto() {
+  const video = document.getElementById("camera");
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
+
+  const image = canvas.toDataURL("image/png");
+
+  // Download image
+  const a = document.createElement("a");
+  a.href = image;
+  a.download = "jarvis_photo.png";
+  a.click();
+
+  addLog("📸 Photo captured");
+}
+
+// Record Video
+
+function startRecording() {
+  if (!stream) return;
+
+  recordedChunks = [];
+
+  mediaRecorder = new MediaRecorder(stream);
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) recordedChunks.push(e.data);
+  };
+
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: "video/webm" });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "jarvis_video.webm";
+    a.click();
+
+    addLog("🎥 Video saved");
+  };
+
+  mediaRecorder.start();
+  addLog("🎥 Recording started");
+}
+
+// Stop Recording
+function stopRecording() {
+  if (mediaRecorder) {
+    mediaRecorder.stop();
+    addLog("⏹ Recording stopped");
+  }
+}
+
+// Close Camera
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+
+  const video = document.getElementById("camera");
+  if (video) {
+    video.srcObject = null;
+  }
+
+  const container = document.getElementById("camera-container");
+  if (container) {
+    container.classList.add("hidden");
+  }
+
+  addLog("📴 Camera stopped");
+}
+
 // 🚀 Init on load
 window.addEventListener("DOMContentLoaded", initWeather);
+document.getElementById("capture-btn")?.addEventListener("click", capturePhoto);
+document.getElementById("record-btn")?.addEventListener("click", startRecording);
+document.getElementById("stop-btn")?.addEventListener("click", stopRecording);

@@ -316,17 +316,44 @@ def _find_controllable_device(devices):
 
 def _get_available_devices():
     _, payload = _spotify_api_request("/me/player/devices")
-    return payload.get("devices", [])
+
+    devices = payload.get("devices", [])
+
+    print("\n[SPOTIFY DEBUG] Devices:")
+    for d in devices:
+        print({
+            "name": d.get("name"),
+            "type": d.get("type"),
+            "active": d.get("is_active"),
+            "restricted": d.get("is_restricted"),
+            "id": d.get("id"),
+        })
+
+    return devices
 
 
 def _wait_for_device():
     _launch_spotify_desktop()
 
-    for _ in range(15):
+    print("[SPOTIFY] Waiting for device...")
+
+    for i in range(20):
         devices = _get_available_devices()
-        device = _find_controllable_device(devices)
-        if device:
-            return device
+
+        for device in devices:
+            if not device.get("is_restricted"):
+                print("[SPOTIFY] Found device:", device.get("name"))
+
+                # 🔥 FORCE ACTIVATE
+                try:
+                    _transfer_playback(device["id"])
+                except Exception as e:
+                    print("[SPOTIFY] Transfer failed:", e)
+
+                time.sleep(2)
+
+                return device
+
         time.sleep(1)
 
     return None
@@ -341,21 +368,56 @@ def _transfer_playback(device_id):
             "play": False,
         },
     )
+    # Give Spotify a moment to register the transferred device before playback
+    time.sleep(3)
 
 
-def _start_playback(device_id, *, context_uri=None, uris=None):
+def _start_playback(device_id, *, context_uri=None, uris=None, _retry=True):
+
+    # 🔥 STEP 1: Transfer playback FIRST
+    try:
+        print("[SPOTIFY] Transferring playback to device:", device_id)
+
+        _spotify_api_request(
+            "/me/player",
+            method="PUT",
+            json_data={
+                "device_ids": [device_id],
+                "play": False
+            }
+        )
+
+        time.sleep(1)
+
+    except Exception as e:
+        print("[SPOTIFY] Transfer failed:", e)
+
+    # 🔥 STEP 2: Build body
     body = {}
     if context_uri:
         body["context_uri"] = context_uri
     if uris:
         body["uris"] = uris
 
-    _spotify_api_request(
-        "/me/player/play",
-        method="PUT",
-        params={"device_id": device_id},
-        json_data=body,
-    )
+    # 🔥 STEP 3: Start playback (NO params device_id)
+    try:
+        _spotify_api_request(
+            "/me/player/play",
+            method="PUT",
+            json_data=body
+        )
+
+        print("[SPOTIFY] Playback started successfully")
+
+    except SpotifyPlaybackError as exc:
+        print("[SPOTIFY ERROR]", exc.status, exc.payload)
+
+        if exc.status == 400 and _retry:
+            print("[SPOTIFY] Retry after wait...")
+            time.sleep(3)
+            return _start_playback(device_id, context_uri=context_uri, uris=uris, _retry=False)
+
+        raise
 
 
 def _search_spotify_item(query):
@@ -463,6 +525,12 @@ def play_spotify_request(command):
         return f"Playing {item['name']} on Spotify."
 
     except SpotifyPlaybackError as exc:
+        if exc.status == 400:
+            return (
+                "Spotify returned a bad request error. Make sure the Spotify app is open "
+                "and a song has been played at least once to activate the device."
+            )
+
         if exc.status == 401:
             _clear_tokens()
             open_spotify_authorization()
