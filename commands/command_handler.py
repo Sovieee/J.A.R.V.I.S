@@ -25,6 +25,7 @@ from commands.smart_actions import (
     handle_media_command,
     normalize_follow_up_text,
     schedule_reminder,
+    get_current_location,
 )
 from commands.spotify_player import play_spotify_request
 from commands.web_search import search_google
@@ -186,6 +187,15 @@ def handle_command(command):
             return respond(f"You like {like}")
 
         return respond("I do not know your preferences yet.")
+    
+    if "where am i" in command or "my location" in command:
+        location = get_current_location()
+
+        if location:
+            speak(f"You are in {location['city']}, {location['country']}")
+            return location  # IMPORTANT: returning JSON for frontend
+
+        return "I couldn't determine your location."
 
     pending_response = handle_pending_intent(command)
     if pending_response is not None:

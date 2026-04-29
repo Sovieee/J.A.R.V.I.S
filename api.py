@@ -2,6 +2,7 @@ import re
 import sys
 import threading
 import time
+import requests
 
 from flask import Flask, jsonify, redirect, request
 from flask_socketio import SocketIO
@@ -132,6 +133,20 @@ def _listening_loop():
             socketio.emit("jarvis_done")
 
         socketio.sleep(0.5)
+
+def get_location():
+    try:
+        res = requests.get("http://ip-api.com/json/")
+        data = res.json()
+
+        return {
+            "city": data.get("city"),
+            "lat": data.get("lat"),
+            "lon": data.get("lon"),
+            "country": data.get("country")
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 if __name__ == "__main__":

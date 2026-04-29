@@ -31,6 +31,47 @@ function addFeed(msg) {
   liveFeed.scrollTop = liveFeed.scrollHeight;
 }
 
+async function getUserLocation() {
+  return new Promise((resolve) => {
+
+    // ✅ Try GPS first
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            source: "gps"
+          });
+        },
+        async () => {
+          // ❌ GPS failed → fallback to backend
+          try {
+            const res = await fetch("http://127.0.0.1:5000/command", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ command: "my location" })
+            });
+
+            const data = await res.json();
+
+            if (data.response && data.response.lat) {
+              resolve({ ...data.response, source: "backend" });
+            } else {
+              resolve(null);
+            }
+
+          } catch {
+            resolve(null);
+          }
+        }
+      );
+    } else {
+      resolve(null);
+    }
+  });
+}
+
 // =======================
 // RANDOM SYSTEM LOGS
 // =======================
@@ -129,7 +170,7 @@ setInterval(() => {
 }, 1500);
 
 // =======================
-// MAP (LEAFLET)
+// REAL MAP (LEAFLET)
 // =======================
 window.addEventListener("DOMContentLoaded", () => {
   if (typeof L === "undefined") {
@@ -149,6 +190,40 @@ window.addEventListener("DOMContentLoaded", () => {
     "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
     { subdomains: "abcd", maxZoom: 19 }
   ).addTo(map);
+
+  // 🌍 USE REAL LOCATION (same as weather)
+  if (!navigator.geolocation) {
+    console.warn("Geolocation not supported");
+    return;
+  }
+
+  getUserLocation().then((location) => {
+    if (!location) {
+      addLog("⚠️ Unable to detect location");
+      return;
+    }
+
+    const { lat, lon, source } = location;
+
+    map.setView([lat, lon], 12);
+
+    const useMarker = L.circleMarker([lat, lon], {
+      radius: 8,
+      color: "#00f7ff",
+      fillColor: "#00f7ff",
+      fillOpacity: 0.9
+    }).addTo(map);
+
+    useMarker.bindPopup(`📍 You are here (${source})`).openPopup();
+
+    addLog(`📍 Location via ${source}`);
+
+    },
+    (err) => {
+      console.warn("Location error:", err.message);
+      addLog("⚠️ Location access denied");
+    }
+  );
 
   // Animated pings
   function addPing() {
@@ -332,35 +407,25 @@ async function loadWeather(lat, lon) {
 // USER LOCATION FOR WEATHER
 // =======================
 
-function initWeather() {
-  if (!navigator.geolocation) {
-    if (weatherCity) weatherCity.textContent = "Location not supported";
+async function initWeather() {
+  const location = await getUserLocation();
+
+  if (!location) {
+    if (weatherCity) weatherCity.textContent = "Location unavailable";
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      loadWeather(pos.coords.latitude, pos.coords.longitude);
-    },
-    (err) => {
-      console.warn("Location denied:", err.message);
-      if (weatherCity) weatherCity.textContent = "Location denied";
-    }
-  );
+  loadWeather(location.lat, location.lon);
 }
 
 // 🔁 Refresh every 5 minutes
-setInterval(() => {
-  if (!navigator.geolocation) return;
+setInterval(async () => {
+  const location = await getUserLocation();
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      loadWeather(pos.coords.latitude, pos.coords.longitude);
-    },
-    (err) => {
-      console.warn("Location error:", err.message);
-    }
-  );
+  if (!location) return;
+
+  loadWeather(location.lat, location.lon);
+
 }, 300000);
 
 // 🚀 Init on load
