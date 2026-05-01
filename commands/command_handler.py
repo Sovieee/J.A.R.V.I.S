@@ -27,7 +27,7 @@ from commands.smart_actions import (
     schedule_reminder,
     get_current_location,
 )
-from commands.spotify_player import play_spotify_request
+from commands.spotify_player import handle_spotify_playback_command, play_spotify_request
 from commands.web_search import search_google
 from intelligence.ai_brain import ask_ai
 from intelligence.context_memory import add_to_history
@@ -45,6 +45,10 @@ from voice.voice_output import speak
 
 last_suggestion = None
 suggestion_rejected = False
+
+LOCATION_REQUEST_PATTERN = re.compile(
+    r"^(?:where am i(?: right now)?|my location|current location|what(?: is|'s) my location)$"
+)
 
 
 def respond(message):
@@ -188,7 +192,7 @@ def handle_command(command):
 
         return respond("I do not know your preferences yet.")
     
-    if "where am i" in command or "my location" in command:
+    if LOCATION_REQUEST_PATTERN.fullmatch(command):
         location = get_current_location()
 
         if location:
@@ -350,6 +354,11 @@ def handle_command(command):
         return respond(play_spotify_request(command))
 
     if intent == "media_control":
+        if "spotify" in command:
+            spotify_response = handle_spotify_playback_command(command)
+            if spotify_response:
+                return respond(spotify_response)
+
         media_response = handle_media_command(command)
         return respond(media_response)
 

@@ -165,6 +165,14 @@ if (input) {
         }
 
         const response = await askJarvis(command);
+        const responseText =
+          typeof response === "string"
+            ? response
+            : typeof response?.response === "string"
+              ? response.response
+              : response?.response
+                ? JSON.stringify(response.response)
+                : "";
         console.log("Backend response:", response);
 
         // 🔥 HANDLE ACTIONS FROM BACKEND
@@ -190,7 +198,7 @@ if (input) {
           stopCamera();
         }
 
-        typeResponse(response);
+        typeResponse(responseText || "Done.");
 
       } catch (err) {
         console.error(err);

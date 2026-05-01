@@ -171,6 +171,31 @@ def _try_parse_json(text):
         return {"raw": text}
 
 
+def _spotify_error_text(payload):
+    error_field = payload.get("error")
+    if isinstance(error_field, dict):
+        if error_field.get("message"):
+            return error_field["message"]
+        if error_field.get("status"):
+            return str(error_field["status"])
+
+    if payload.get("error_description"):
+        return payload["error_description"]
+
+    if isinstance(error_field, str):
+        return error_field
+
+    if payload.get("raw"):
+        return payload["raw"]
+
+    return ""
+
+
+def _is_revoked_token_error(payload):
+    text = _spotify_error_text(payload).lower()
+    return "invalid_grant" in text or "revoked" in text
+
+
 def create_spotify_authorize_url():
     if not spotify_is_configured():
         raise SpotifyPlaybackError(
@@ -238,15 +263,25 @@ def _refresh_access_token():
     if not refresh_token:
         raise SpotifyPlaybackError("Spotify is not authorized yet.")
 
-    status, text = _http_request(
-        SPOTIFY_TOKEN_URL,
-        method="POST",
-        form_data={
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "client_id": _client_id(),
-        },
-    )
+    try:
+        status, text = _http_request(
+            SPOTIFY_TOKEN_URL,
+            method="POST",
+            form_data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": _client_id(),
+            },
+        )
+    except SpotifyPlaybackError as exc:
+        if exc.status == 400 and _is_revoked_token_error(exc.payload):
+            _clear_tokens()
+            raise SpotifyPlaybackError(
+                "Spotify authorization expired.",
+                status=401,
+                payload=exc.payload,
+            ) from exc
+        raise
 
     if status != 200:
         raise SpotifyPlaybackError("Spotify token refresh failed.")
@@ -404,6 +439,7 @@ def _start_playback(device_id, *, context_uri=None, uris=None, _retry=True):
         _spotify_api_request(
             "/me/player/play",
             method="PUT",
+            params={"device_id": device_id} if device_id else None,
             json_data=body
         )
 
@@ -418,6 +454,34 @@ def _start_playback(device_id, *, context_uri=None, uris=None, _retry=True):
             return _start_playback(device_id, context_uri=context_uri, uris=uris, _retry=False)
 
         raise
+
+
+def _pause_playback(device_id=None):
+    params = {"device_id": device_id} if device_id else None
+    _spotify_api_request(
+        "/me/player/pause",
+        method="PUT",
+        params=params,
+    )
+
+
+def _resume_playback(device_id=None):
+    params = {"device_id": device_id} if device_id else None
+    _spotify_api_request(
+        "/me/player/play",
+        method="PUT",
+        params=params,
+    )
+
+
+def _describe_spotify_error(exc, default_message):
+    payload = exc.payload or {}
+    message = _spotify_error_text(payload)
+
+    if message:
+        return f"{default_message} ({message})"
+
+    return default_message
 
 
 def _search_spotify_item(query):
@@ -510,25 +574,51 @@ def play_spotify_request(command):
 
         query = extract_spotify_query(command)
         if not query:
-            _start_playback(device["id"], context_uri=SPOTIFY_TOP_HITS_URI)
+            try:
+                _start_playback(device["id"], context_uri=SPOTIFY_TOP_HITS_URI)
+            except SpotifyPlaybackError as exc:
+                if exc.status == 400:
+                    return _describe_spotify_error(
+                        exc,
+                        "Spotify could not start playback on the selected device.",
+                    )
+                raise
             return "Playing Today's Top Hits on Spotify."
 
-        item = _search_spotify_item(query)
+        try:
+            item = _search_spotify_item(query)
+        except SpotifyPlaybackError as exc:
+            if exc.status == 400:
+                return _describe_spotify_error(
+                    exc,
+                    f"Spotify search failed for {query}.",
+                )
+            raise
+
         if not item:
             return f"I could not find anything on Spotify for {query}."
 
-        if item["kind"] == "track":
-            _start_playback(device["id"], uris=[item["uri"]])
-        else:
-            _start_playback(device["id"], context_uri=item["uri"])
+        try:
+            if item["kind"] == "track":
+                _start_playback(device["id"], uris=[item["uri"]])
+            else:
+                _start_playback(device["id"], context_uri=item["uri"])
+        except SpotifyPlaybackError as exc:
+            if exc.status == 400:
+                return _describe_spotify_error(
+                    exc,
+                    f"Spotify found {item['name']}, but could not start playback.",
+                )
+            raise
 
         return f"Playing {item['name']} on Spotify."
 
     except SpotifyPlaybackError as exc:
         if exc.status == 400:
-            return (
+            return _describe_spotify_error(
+                exc,
                 "Spotify returned a bad request error. Make sure the Spotify app is open "
-                "and a song has been played at least once to activate the device."
+                "and a song has been played at least once to activate the device.",
             )
 
         if exc.status == 401:
@@ -539,6 +629,76 @@ def play_spotify_request(command):
         if exc.status == 403:
             return (
                 "Spotify playback control needs Spotify Premium and a controllable active device."
+            )
+
+        return str(exc)
+
+
+def handle_spotify_playback_command(command):
+    normalized = command.lower().strip()
+
+    should_pause = "pause" in normalized
+    should_stop = "stop" in normalized
+    should_resume = (
+        "resume" in normalized
+        or "continue" in normalized
+        or normalized == "play spotify"
+    )
+
+    if not (should_pause or should_stop or should_resume):
+        return None
+
+    if not spotify_is_configured():
+        return (
+            "Spotify is not configured yet. Add SPOTIFY_CLIENT_ID to your .env and "
+            f"register {_redirect_uri()} as a redirect URI in your Spotify app."
+        )
+
+    if not spotify_is_authorized():
+        open_spotify_authorization()
+        return (
+            "I opened Spotify sign-in in your browser. Approve access, then ask me again."
+        )
+
+    try:
+        device = _find_controllable_device(_get_available_devices())
+
+        if not device and should_resume:
+            device = _wait_for_device()
+
+        if not device:
+            return (
+                "I could not find a controllable Spotify device. Open the Spotify desktop app and try again."
+            )
+
+        device_id = device.get("id")
+        if device_id and not device.get("is_active"):
+            _transfer_playback(device_id)
+
+        if should_pause or should_stop:
+            _pause_playback(device_id)
+            return "Stopped Spotify playback." if should_stop else "Paused Spotify playback."
+
+        _resume_playback(device_id)
+        return "Resumed Spotify playback."
+
+    except SpotifyPlaybackError as exc:
+        if exc.status == 401:
+            _clear_tokens()
+            open_spotify_authorization()
+            return "Your Spotify session expired. I opened sign-in again; please approve access and retry."
+
+        if exc.status == 403:
+            return (
+                "Spotify playback control needs Spotify Premium and a controllable active device."
+            )
+
+        if exc.status in {400, 404} and normalized == "play spotify":
+            return play_spotify_request(command)
+
+        if exc.status in {400, 404}:
+            return (
+                "Spotify could not control playback yet. Open the Spotify desktop app and make sure it has an active device."
             )
 
         return str(exc)

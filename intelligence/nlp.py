@@ -139,6 +139,12 @@ def detect_intent(command):
     if _contains_phrase(command, REMINDER_KEYWORDS):
         return "reminder"
 
+    if "spotify" in command:
+        if any(word in command for word in ("pause", "resume", "stop", "continue")):
+            return "media_control"
+        if command.strip() == "play spotify":
+            return "media_control"
+
     if _contains_phrase(command, MEDIA_KEYWORDS):
         return "media_control"
 
