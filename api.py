@@ -34,6 +34,35 @@ def safe_console_print(*parts):
         print(*safe_parts)
 
 
+def _socket_response_text(response):
+    if response is None:
+        return ""
+
+    if isinstance(response, str):
+        return response.strip()
+
+    if isinstance(response, dict):
+        action = response.get("action")
+        if action:
+            action_messages = {
+                "open_camera": "Opening the camera.",
+                "capture_photo": "Capturing a photo.",
+                "record_video": "Starting video recording.",
+                "stop_recording": "Stopping the recording.",
+                "close_camera": "Closing the camera.",
+            }
+            return action_messages.get(action, "")
+
+        city = response.get("city")
+        country = response.get("country")
+        if city and country:
+            return f"You are in {city}, {country}."
+
+        return str(response).strip()
+
+    return str(response).strip()
+
+
 @app.route("/command", methods=["POST"])
 def run_command():
     data = request.json
@@ -45,7 +74,7 @@ def run_command():
         response = handle_command(command) or "Done"
 
         # 🔥 If it's an action dict → send directly
-        if isinstance(response, dict):
+        if isinstance(response, dict) and response.get("action"):
             return jsonify(response)
 
         return jsonify({
@@ -133,16 +162,17 @@ def _listening_loop():
             socketio.emit("jarvis_user", {"command": command})
 
             response = handle_command(command) or "Done"
+            response_text = _socket_response_text(response)
 
             safe_console_print("[STREAM] Sending response:", response)
 
-            if response and response.strip():
-                chunks = re.findall(r".{1,40}(?:\s|$)", response)
+            if response_text:
+                chunks = re.findall(r".{1,40}(?:\s|$)", response_text)
                 for chunk in chunks:
                     socketio.emit("jarvis_chunk", {"chunk": chunk})
                     socketio.sleep(0.08)
 
-            if not response:
+            if not response_text:
                 socketio.emit("jarvis_chunk", {"chunk": "Sorry, I didn't understand."})
 
             socketio.emit("jarvis_done")

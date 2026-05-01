@@ -1,0 +1,8 @@
+{
+  "name": "jarvis",
+  "private": true,
+  "main": "frontend/electron-app/main.js",
+  "scripts": {
+    "start": "node frontend/electron-app/node_modules/electron/cli.js ."
+  }
+}
