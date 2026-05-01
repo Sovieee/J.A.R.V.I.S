@@ -1,0 +1,93 @@
+J.A.R.V.I.S Features
+
+Core Interaction
+- Voice-activated assistant with the wake word "Jarvis".
+- Typed command support through the Electron desktop interface.
+- Spoken responses using text-to-speech.
+- On-screen text responses in the desktop UI.
+- Conversation mode support so follow-up requests can work without repeating the wake word every time.
+- AI fallback for general questions and explanations when a direct built-in command is not matched.
+
+Memory and Personalization
+- Remembers your name.
+- Remembers a preferred nickname.
+- Remembers things you like.
+- Stores simple preferences such as your preferred browser.
+- Can answer questions like "what is my name", "what do you call me", and "what do I like".
+
+App and System Shortcuts
+- Open Chrome.
+- Open Notepad.
+- Open Spotify.
+- Open Calculator.
+- Open VS Code.
+- Open WhatsApp.
+- Open Netflix.
+- Open Amazon Prime Video.
+- Open Microsoft Word.
+- Open Microsoft Excel.
+- Open Microsoft PowerPoint.
+- Open Windows Settings.
+- Open File Explorer.
+
+Spotify and Music Control
+- Play songs, albums, playlists, or general music on Spotify.
+- Search Spotify and start playback of the best match.
+- Resume Spotify playback.
+- Pause Spotify playback.
+- Stop Spotify playback.
+- Handle Spotify device activation and playback transfer.
+- Re-authorize Spotify automatically when the session expires.
+
+General Media Controls
+- Pause media playback.
+- Resume media playback.
+- Stop media playback.
+- Skip to the next track.
+- Go back to the previous track.
+- Mute and unmute audio.
+- Increase system volume.
+- Decrease system volume.
+
+Search and Information
+- Search Google from voice or typed commands.
+- Handle follow-up search queries after asking what to search for.
+- Answer weather questions for specific cities.
+- Answer time and date questions for the current location or supported cities/timezones.
+- Detect current approximate location using IP fallback.
+
+Camera Features
+- Open the camera from the desktop interface.
+- Capture photos.
+- Record video.
+- Stop video recording.
+- Close the camera feed.
+
+Reminders and Productivity
+- Set reminders using relative time, such as minutes or hours.
+- Set reminders using absolute times like "at 8 PM".
+- Handle follow-up reminder conversations when the task or time is missing.
+- Speak the reminder out loud when it is due.
+
+Math and Utility
+- Solve basic arithmetic expressions.
+- Handle spoken math phrases such as plus, minus, divided by, multiplied by, percent of, and square root.
+
+Context Awareness and Learning
+- Uses current location context in AI replies when available.
+- Stores recent conversation history for better AI continuity.
+- Logs user activity locally.
+- Suggests commonly used actions based on time of day and past usage.
+
+Frontend Dashboard Features
+- Desktop interface built with Electron.
+- Live command log.
+- Live feed status panel.
+- Weather display for the detected location.
+- Map display with current location marker.
+- Simulated system status widgets for CPU and RAM.
+- Line chart visualization for usage stats.
+
+Privacy and Storage
+- Stores memory, activity logs, and Spotify tokens locally on the device.
+- Uses microphone, location, camera, and file manager access to enable assistant features.

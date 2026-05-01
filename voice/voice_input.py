@@ -1,8 +1,11 @@
 import speech_recognition as sr
 import time
+from voice.voice_output import wait_until_idle
 
 time.sleep(1)
 def listen_command():
+    wait_until_idle()
+
     recognizer = sr.Recognizer()
     recognizer.energy_threshold = 300
     recognizer.pause_threshold = 0.8
