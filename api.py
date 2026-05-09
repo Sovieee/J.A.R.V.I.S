@@ -17,9 +17,7 @@ from commands.spotify_player import (
 from intelligence.context_state import set_conversation_mode
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
-
-
+socketio = SocketIO(app, cors_allowed_origins="*")
 def safe_console_print(*parts):
     try:
         print(*parts)
@@ -195,4 +193,4 @@ def get_location():
 
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=False, use_reloader=False, host="127.0.0.1", port=5000, allow_unsafe_werkzeug=True)

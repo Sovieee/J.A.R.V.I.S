@@ -3,14 +3,47 @@
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron .",
+    "clean": "if exist dist rmdir /s /q dist",
+    "build": "electron-builder --win"
   },
   "keywords": [],
-  "author": "",
+  "author": "Your Name",
   "license": "ISC",
-  "description": "",
+  "description": "J.A.R.V.I.S Desktop Assistant",
   "dependencies": {
-    "dotenv": "^17.4.2",
-    "electron": "^41.1.1"
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "electron": "^41.1.1",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.jarvis.assistant",
+    "productName": "J.A.R.V.I.S",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/jarvis.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "**/*",
+      "!node_modules/.cache"
+    ],
+    "extraResources": [
+      {
+        "from": "../../dist/api.exe",
+        "to": "api.exe"
+      },
+      {
+        "from": "../../.env",
+        "to": ".env"
+      }
+    ]
   }
 }
