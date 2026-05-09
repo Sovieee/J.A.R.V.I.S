@@ -2,8 +2,32 @@
 // ELEMENTS
 // =======================
 const { ipcRenderer } = require("electron");
-const socket = io("http://127.0.0.1:5000");
-const logs = document.getElementById("logs");
+const socket = io("http://127.0.0.1:5000", {
+  transports: ["polling", "websocket"],
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000
+});
+
+// ✅ Update connection status
+socket.on("connect", () => {
+  console.log("✅ Socket connected");
+  const statusEl = document.getElementById("status");
+  if (statusEl) statusEl.textContent = "ONLINE";
+  const aiTextEl = document.getElementById("ai-text");
+  if (aiTextEl && aiTextEl.textContent.includes("not reachable")) {
+    aiTextEl.textContent = "Online. How can I help?";
+  }
+});
+
+socket.on("disconnect", () => {
+  console.log("❌ Socket disconnected");
+  const statusEl = document.getElementById("status");
+  if (statusEl) statusEl.textContent = "OFFLINE";
+});
+
+socket.on("connect_error", (err) => {
+  console.error("Socket error:", err.message);
+});const logs = document.getElementById("logs");
 const aiText = document.getElementById("ai-text");
 const input = document.getElementById("command-input");
 const liveFeed = document.getElementById("live-feed");
@@ -120,8 +144,8 @@ async function askJarvis(command) {
 
   } catch (err) {
     console.error(err);
-    return "⚠️ Backend not reachable";
-  }
+typeResponse("⚠️ Backend not reachable");
+return null;  }
 }
 
 // =======================
